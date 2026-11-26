@@ -1,4 +1,5 @@
 {
+  "source": "synthetic",
   "id": "f4-map-partial",
   "description": "Map ProcessMap fails on one item",
   "faultId": "F4",

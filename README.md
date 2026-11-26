@@ -43,8 +43,8 @@ In `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "node",
       "args": ["/ABS/PATH/TO/sfn-lens/packages/server/dist/index.js"],
       "env": {
-        "AWS_PROFILE": "personal",
-        "AWS_REGION": "eu-north-1"
+        "AWS_PROFILE": "YOUR_PROFILE",
+        "AWS_REGION": "YOUR_REGION"
       }
     }
   }
@@ -92,7 +92,7 @@ bash ../scripts/inject_faults.sh
 | `AWS_PROFILE` | — | Optional; SDK default credential chain if unset (env keys, SSO, shared config) |
 | `AWS_REGION` / `AWS_DEFAULT_REGION` | — | Optional; SDK / shared-config region if unset |
 | `SFN_LENS_MODE` | `live` | `live` or `fixture` |
-| `SFN_LENS_FIXTURE_DIR` | `fixtures/` | Offline recordings |
+| `SFN_LENS_FIXTURE_DIR` | `fixtures/` | Synthetic offline fixtures (see `fixtures/README.md`) |
 | `SFN_LENS_REDACT_JSONPATHS` | — | e.g. `$.customer.ssn,$.items[*].ssn` |
 | `SFN_LENS_ALLOW_REDRIVE` | off | Set `true` to enable redrive |
 

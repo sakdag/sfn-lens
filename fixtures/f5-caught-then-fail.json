@@ -1,4 +1,5 @@
 {
+  "source": "synthetic",
   "id": "f5-caught-then-fail",
   "description": "Process fails, Catch handles it, then FailAfterCatch fails the execution",
   "faultId": "F5",

@@ -1,4 +1,5 @@
 {
+  "source": "synthetic",
   "id": "f4-map-large",
   "description": "Large Map run (80 items); failure on the last item — stresses history tail",
   "faultId": "F4-LARGE",

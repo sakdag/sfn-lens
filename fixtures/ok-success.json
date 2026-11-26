@@ -73,13 +73,17 @@
       "id": 4,
       "type": "ChoiceStateEntered",
       "timestamp": "2026-11-26T09:00:00.450Z",
-      "stateEnteredEventDetails": { "name": "Route" }
+      "stateEnteredEventDetails": {
+        "name": "Route"
+      }
     },
     {
       "id": 5,
       "type": "ChoiceStateExited",
       "timestamp": "2026-11-26T09:00:00.500Z",
-      "stateExitedEventDetails": { "name": "Route" }
+      "stateExitedEventDetails": {
+        "name": "Route"
+      }
     },
     {
       "id": 6,
@@ -103,13 +107,17 @@
       "id": 8,
       "type": "SucceedStateEntered",
       "timestamp": "2026-11-26T09:00:01.300Z",
-      "stateEnteredEventDetails": { "name": "Done" }
+      "stateEnteredEventDetails": {
+        "name": "Done"
+      }
     },
     {
       "id": 9,
       "type": "SucceedStateExited",
       "timestamp": "2026-11-26T09:00:01.400Z",
-      "stateExitedEventDetails": { "name": "Done" }
+      "stateExitedEventDetails": {
+        "name": "Done"
+      }
     },
     {
       "id": 10,
@@ -121,5 +129,6 @@
     "failedState": null,
     "errorClass": null,
     "rootCause": null
-  }
+  },
+  "source": "synthetic"
 }

@@ -19,7 +19,10 @@
       "Validate": {
         "Type": "Task",
         "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-        "Parameters": { "step": "validate", "fault.$": "$.fault" },
+        "Parameters": {
+          "step": "validate",
+          "fault.$": "$.fault"
+        },
         "Next": "Route"
       },
       "Route": {
@@ -36,10 +39,15 @@
       "Process": {
         "Type": "Task",
         "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-        "Parameters": { "step": "process", "fault.$": "$.fault" },
+        "Parameters": {
+          "step": "process",
+          "fault.$": "$.fault"
+        },
         "Retry": [
           {
-            "ErrorEquals": ["States.ALL"],
+            "ErrorEquals": [
+              "States.ALL"
+            ],
             "MaxAttempts": 0
           }
         ],
@@ -86,13 +94,17 @@
       "id": 4,
       "type": "ChoiceStateEntered",
       "timestamp": "2026-11-26T10:00:00.450Z",
-      "stateEnteredEventDetails": { "name": "Route" }
+      "stateEnteredEventDetails": {
+        "name": "Route"
+      }
     },
     {
       "id": 5,
       "type": "ChoiceStateExited",
       "timestamp": "2026-11-26T10:00:00.500Z",
-      "stateExitedEventDetails": { "name": "Route" }
+      "stateExitedEventDetails": {
+        "name": "Route"
+      }
     },
     {
       "id": 6,
@@ -124,11 +136,22 @@
   ],
   "stateDetails": {
     "Validate": {
-      "input": { "fault": "lambda_error", "customer": { "email": "ada@example.com" } },
-      "output": { "fault": "lambda_error", "ok": true }
+      "input": {
+        "fault": "lambda_error",
+        "customer": {
+          "email": "ada@example.com"
+        }
+      },
+      "output": {
+        "fault": "lambda_error",
+        "ok": true
+      }
     },
     "Process": {
-      "input": { "fault": "lambda_error", "ok": true },
+      "input": {
+        "fault": "lambda_error",
+        "ok": true
+      },
       "error": "States.TaskFailed",
       "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"injected lambda failure\"}"
     }
@@ -137,5 +160,6 @@
     "failedState": "Process",
     "errorClass": "States.TaskFailed",
     "rootCause": "injected lambda failure"
-  }
+  },
+  "source": "synthetic"
 }

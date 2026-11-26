@@ -180,6 +180,18 @@ describe("redaction", () => {
     const out = redactErrorCause("failed for user ada@example.com");
     assert.equal(out, "failed for user [REDACTED]");
   });
+
+  it("scrubs emails embedded inside Lambda errorMessage strings", () => {
+    const cause = JSON.stringify({
+      errorMessage: 'bad input {"email":"a@b.com"}',
+    });
+    const redacted = redactErrorCause(cause);
+    assert.ok(redacted);
+    assert.equal(redacted!.includes("a@b.com"), false);
+    assert.match(redacted!, /REDACTED/);
+    const parsed = JSON.parse(redacted!);
+    assert.equal(parsed.errorMessage, "bad input {\"email\":\"[REDACTED]\"}");
+  });
 });
 
 describe("compare", () => {

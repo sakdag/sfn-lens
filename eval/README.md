@@ -1,6 +1,6 @@
 # Eval harness
 
-Compares diagnosis quality when the model sees the real `ExecutionSummary` (from `@sfn-lens/core`) vs truncated raw `GetExecutionHistory`.
+Compares failed-state diagnosis when the model sees the real `ExecutionSummary` (from `@sfn-lens/core`) vs truncated raw `GetExecutionHistory`, on **synthetic** fixtures.
 
 ```bash
 npm run build:core
@@ -16,4 +16,4 @@ npm run eval -- --limit 7
 
 Cost guard: refuses to run if the estimated upper bound exceeds `$1.00`.
 
-Results land in `eval/results/latest.json`.
+Results: `eval/results/latest.json`. Headline numbers and caveats: [`docs/EVAL.md`](../docs/EVAL.md).

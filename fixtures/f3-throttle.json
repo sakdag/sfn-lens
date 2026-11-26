@@ -1,4 +1,5 @@
 {
+  "source": "synthetic",
   "id": "f3-throttle",
   "description": "Process throttles, retries, then Catch routes to Done",
   "faultId": "F3",

@@ -74,6 +74,11 @@ function walk(
   extraKeys: Set<string>,
 ): unknown {
   if (value == null) return value;
+  if (typeof value === "string") {
+    // Lambda causes often embed PII inside string values, e.g.
+    // errorMessage: 'bad input {"email":"a@b.com"}'
+    return scrubPlainText(value);
+  }
   if (Array.isArray(value)) {
     return value.map((item, i) => walk(item, `${path}[${i}]`, paths, extraKeys));
   }

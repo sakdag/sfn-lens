@@ -1,4 +1,5 @@
 {
+  "source": "synthetic",
   "id": "f6-reject",
   "description": "Choice Route sends fault=reject to Reject Fail state",
   "faultId": "F6",

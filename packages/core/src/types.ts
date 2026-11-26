@@ -210,10 +210,12 @@ export interface ExecutionCompareResult {
   summaryText: string;
 }
 
-/** Recorded fixture for offline / CI use. */
+/** Fixture for offline / CI use (synthetic or recorded). */
 export interface ExecutionFixture {
   id: string;
   description: string;
+  /** `synthetic` = generated locally; `recorded` = from a real GetExecutionHistory. */
+  source?: "synthetic" | "recorded";
   faultId?: string;
   execution: {
     executionArn: string;

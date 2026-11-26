@@ -1,4 +1,5 @@
 {
+  "source": "synthetic",
   "id": "f2-timeout",
   "description": "Process task times out (caught, execution still succeeds via HandleError→Done)",
   "faultId": "F2",

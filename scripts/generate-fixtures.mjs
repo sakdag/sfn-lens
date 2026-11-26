@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Generate offline fixtures for the six injected faults + one large Map run.
+ * Generate SYNTHETIC offline fixtures for the six injected faults + one large Map run.
+ * These are not GetExecutionHistory downloads — see fixtures/README.md.
  * Run: node scripts/generate-fixtures.mjs
  */
 import fs from "node:fs";
@@ -140,8 +141,9 @@ function maybeMapChoice(events, id, state, nextIsMap) {
 }
 
 function write(fix) {
+  const payload = { source: "synthetic", ...fix };
   const file = path.join(OUT, `${fix.id}.json`);
-  fs.writeFileSync(file, JSON.stringify(fix, null, 2) + "\n");
+  fs.writeFileSync(file, JSON.stringify(payload, null, 2) + "\n");
   console.log("wrote", path.relative(ROOT, file));
 }
 
