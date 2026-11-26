@@ -229,16 +229,11 @@ export function createServer(): McpServer {
       if (fixtureModeEnabled()) {
         const fixtures = await listFixtures();
         const machines = [
-          ...new Map(
-            fixtures.map((f) => [
-              "fixture",
-              {
-                name: "fixtures",
-                stateMachineArn: "fixture",
-                status: "ACTIVE",
-              },
-            ]),
-          ).values(),
+          {
+            name: "fixtures",
+            stateMachineArn: "fixture",
+            status: "ACTIVE",
+          },
         ];
         return {
           content: [{ type: "text", text: JSON.stringify({ machines, fixtures }, null, 2) }],
