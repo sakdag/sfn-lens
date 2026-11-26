@@ -54,6 +54,9 @@ export async function loadLiveExecution(
   cause?: string;
   input?: string;
   output?: string;
+  redriveCount: number;
+  redriveDate?: string;
+  redriveStatus?: string;
   definition: AslDefinition;
   history: CoreHistoryEvent[];
 }> {
@@ -81,6 +84,9 @@ export async function loadLiveExecution(
     cause: desc.cause,
     input: desc.input,
     output: desc.output,
+    redriveCount: desc.redriveCount ?? 0,
+    redriveDate: desc.redriveDate?.toISOString(),
+    redriveStatus: desc.redriveStatus,
     definition,
     history: history.map(toCoreEvent),
   };

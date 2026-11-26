@@ -66,6 +66,9 @@ async function loadExecutionData(input: {
   history: import("@sfn-lens/core").HistoryEvent[];
   stateDetails?: Record<string, { input?: unknown; output?: unknown; error?: string; cause?: string }>;
   definitionText?: string;
+  redriveCount?: number;
+  redriveDate?: string;
+  redriveStatus?: string;
 }> {
   if (fixtureModeEnabled() || input.fixtureId) {
     const fix = input.fixtureId
@@ -117,6 +120,9 @@ async function loadExecutionData(input: {
     view,
     history: live.history,
     definitionText: JSON.stringify(live.definition, null, 2),
+    redriveCount: live.redriveCount,
+    redriveDate: live.redriveDate,
+    redriveStatus: live.redriveStatus,
   };
 }
 
@@ -164,7 +170,8 @@ export function createServer(): McpServer {
       },
     },
     async (args) => {
-      const { view, definitionText } = await loadExecutionData(args);
+      const { view, definitionText, redriveCount, redriveDate, redriveStatus } =
+        await loadExecutionData(args);
       const laidOut = layoutGraph(view.graph);
       const structuredContent = {
         view: "execution" as const,
@@ -172,8 +179,12 @@ export function createServer(): McpServer {
         graph: laidOut,
         overlay: view.overlay,
         definitionText,
+        redriveCount: redriveCount ?? 0,
+        redriveDate,
+        redriveStatus,
         capabilities: serverCapabilities(),
-        redrivable: canRedriveStatus(view.summary.status),
+        redrivable:
+          canRedriveStatus(view.summary.status) && redriveStatus !== "NOT_REDRIVABLE",
       };
       return {
         content: [{ type: "text", text: toolText(view.summary) }],

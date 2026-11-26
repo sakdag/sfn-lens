@@ -93,6 +93,9 @@ export interface ShowExecutionPayload {
   definitionText?: string;
   capabilities?: Capabilities;
   redrivable?: boolean;
+  redriveCount?: number;
+  redriveDate?: string;
+  redriveStatus?: string;
 }
 
 export interface ExecutionListItem {

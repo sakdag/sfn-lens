@@ -111,9 +111,13 @@ export function App() {
     },
   });
 
-  function applyExecution(next: ShowExecutionPayload) {
+  function applyExecution(next: ShowExecutionPayload, opts?: { clearBanner?: boolean; switchToGraph?: boolean }) {
     setPayload(next);
-    setSelected(next.failedState ?? next.overlay.failedState);
+    const terminalFail =
+      next.status === "FAILED" || next.status === "TIMED_OUT" || next.status === "ABORTED";
+    setSelected(
+      terminalFail ? (next.failedState ?? next.overlay.failedState) : next.failedState,
+    );
     setDetail(null);
     setExecStateMachineArn(next.stateMachineArn);
     if (next.definitionText) {
@@ -124,8 +128,8 @@ export function App() {
         definitionText: next.definitionText,
       });
     }
-    setTab("graph");
-    setBanner(null);
+    if (opts?.switchToGraph !== false) setTab("graph");
+    if (opts?.clearBanner) setBanner(null);
   }
 
   useEffect(() => {
@@ -311,27 +315,54 @@ export function App() {
     [],
   );
 
+  const reloadExecution = useCallback(
+    async (mcp: McpApp, executionArn: string) => {
+      const refreshed = await mcp.callServerTool({
+        name: "show_execution",
+        arguments: executionArn.startsWith("fixture:")
+          ? { fixtureId: executionArn.replace(/^fixture:/, "") }
+          : { executionArn },
+      });
+      const data = refreshed.structuredContent as ShowExecutionPayload | undefined;
+      if (data?.graph) applyExecution(data, { switchToGraph: false, clearBanner: false });
+      return data;
+    },
+    [],
+  );
+
   const confirmRedrive = useCallback(
     async (mcp: McpApp, current: ShowExecutionPayload) => {
       setRedriveBusy(true);
       setRedriveError(null);
+      const priorCount = current.redriveCount ?? 0;
       try {
-        const result = await mcp.callServerTool({
+        await mcp.callServerTool({
           name: "redrive_execution",
           arguments: { executionArn: current.executionArn, confirm: true },
         });
-        const redriveDate = (result.structuredContent as { redriveDate?: string } | undefined)
-          ?.redriveDate;
         setRedriveOpen(false);
-        setBanner(
-          `Redrive started${redriveDate ? ` at ${redriveDate}` : ""}. Refreshing execution…`,
-        );
-        const refreshed = await mcp.callServerTool({
-          name: "show_execution",
-          arguments: { executionArn: current.executionArn },
-        });
-        const data = refreshed.structuredContent as ShowExecutionPayload | undefined;
-        if (data?.graph) applyExecution(data);
+        setBanner("Redrive accepted. Waiting for status update…");
+
+        // Same ARN is reused; poll briefly — short failures can finish before first refresh.
+        let data: ShowExecutionPayload | undefined;
+        for (let i = 0; i < 8; i++) {
+          await new Promise((r) => setTimeout(r, i === 0 ? 400 : 700));
+          data = await reloadExecution(mcp, current.executionArn);
+          if (!data) continue;
+          const count = data.redriveCount ?? 0;
+          if (data.status === "RUNNING" || count > priorCount) break;
+        }
+
+        if (data?.status === "FAILED" || data?.status === "TIMED_OUT" || data?.status === "ABORTED") {
+          setBanner(
+            `Redrive ran (count ${data.redriveCount ?? "?"}) but the execution is ${data.status} again — same input/path often fails the same way (e.g. Reject).`,
+          );
+        } else if (data?.status === "RUNNING") {
+          setBanner("Redrive in progress — auto-refreshing while RUNNING.");
+        } else if (data?.status === "SUCCEEDED") {
+          setBanner("Redrive finished successfully.");
+        }
+
         await refreshExecutions(mcp, { stateMachineArn: current.stateMachineArn });
       } catch (e) {
         setRedriveError(e instanceof Error ? e.message : "Redrive failed");
@@ -339,8 +370,33 @@ export function App() {
         setRedriveBusy(false);
       }
     },
-    [refreshExecutions],
+    [refreshExecutions, reloadExecution],
   );
+
+  // Auto-refresh while the open execution is RUNNING.
+  useEffect(() => {
+    if (!app || !payload?.executionArn) return;
+    if (payload.status !== "RUNNING") return;
+    if (isFixtureArn(payload.executionArn)) return;
+
+    const tick = () => {
+      void reloadExecution(app, payload.executionArn).then((data) => {
+        if (data && data.status !== "RUNNING") {
+          setBanner(`Execution finished: ${data.status}`);
+          void refreshExecutions(app, { stateMachineArn: data.stateMachineArn });
+        }
+      });
+    };
+
+    const id = window.setInterval(tick, 2500);
+    return () => window.clearInterval(id);
+  }, [
+    app,
+    payload?.executionArn,
+    payload?.status,
+    reloadExecution,
+    refreshExecutions,
+  ]);
 
   const palette = useMemo(() => {
     void theme;
@@ -447,17 +503,35 @@ export function App() {
             <span className={`badge ${payload.status}`}>{payload.status}</span>
             <span className="meta">{payload.name}</span>
             {fixture ? <span className="fixture-tag">fixture (not in AWS)</span> : null}
-            {payload.failedState ? (
+            {payload.failedState &&
+            (payload.status === "FAILED" ||
+              payload.status === "TIMED_OUT" ||
+              payload.status === "ABORTED") ? (
               <span className="meta">failed @ {payload.failedState}</span>
             ) : null}
             {payload.durationMs != null ? (
               <span className="meta">{payload.durationMs} ms</span>
+            ) : null}
+            {(payload.redriveCount ?? 0) > 0 ? (
+              <span className="meta">redriven ×{payload.redriveCount}</span>
             ) : null}
           </>
         ) : (
           <span className="meta">Open an execution or browse the list</span>
         )}
         <div className="header-actions">
+          {payload && !fixture ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setBanner(null);
+                void reloadExecution(app, payload.executionArn);
+              }}
+            >
+              Refresh
+            </button>
+          ) : null}
           {showRedrive ? (
             <button
               type="button"

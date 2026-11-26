@@ -22,6 +22,15 @@ The official MCP Apps SDK (`@modelcontextprotocol/ext-apps`) is TypeScript. The 
 - **Fixture mode** for offline use and CI
 - Cheap Terraform demo workflow + fault injection in `eu-north-1`
 - Light and dark themes (follows the host when available)
+- **Refresh** on the open execution; auto-polls while status is `RUNNING`
+
+![Failed execution graph in chat](docs/images/console-graph.png)
+
+*Graph tab — failed path highlighted, state detail on the right.*
+
+![Executions list with filters](docs/images/console-executions.png)
+
+*Executions tab — filter by status/name and open another run.*
 
 ## Requirements
 
@@ -58,7 +67,9 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 Omit `SFN_LENS_ALLOW_REDRIVE` (or set it to `false`) to keep the server mutation-free. Your IAM principal also needs `states:RedriveExecution` for redrive to succeed.
 
-Restart Claude Desktop. Then ask: “Show me the latest failed Step Functions execution” or pass an execution ARN.
+Restart Claude Desktop. Then ask something like: “Show me the latest failed Step Functions run on sfn-lens-demo.”
+
+**Live updates:** use **Refresh** in the console header. While an execution is `RUNNING`, the graph auto-refreshes every few seconds. Redrive keeps the same execution ARN — if the workflow fails the same way again (e.g. a `Reject` path with the same input), status will still show `FAILED` after redrive; check `redriven ×N` in the header.
 
 ### Fixture mode (no AWS)
 
