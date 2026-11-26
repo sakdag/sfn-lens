@@ -67,6 +67,7 @@ export function App() {
   const { app, error } = useApp({
     appInfo: { name: "sfn-lens", version: "0.1.0" },
     capabilities: {},
+    autoResize: true,
     onAppCreated: (created) => {
       created.ontoolresult = async (result) => {
         const data = result.structuredContent as Record<string, unknown> | undefined;
