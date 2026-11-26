@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Start demo executions for each fault type. Requires AWS_PROFILE=personal.
+# Start demo executions for each fault type.
+# Uses AWS CLI default credential chain; set AWS_PROFILE / AWS_REGION if needed.
 set -euo pipefail
 
-PROFILE="${AWS_PROFILE:-personal}"
-REGION="${AWS_REGION:-eu-north-1}"
 ARN="${STATE_MACHINE_ARN:?Set STATE_MACHINE_ARN from terraform output}"
 
 start() {
   local name="$1"
   local input="$2"
-  aws --profile "$PROFILE" --region "$REGION" stepfunctions start-execution \
+  aws stepfunctions start-execution \
     --state-machine-arn "$ARN" \
     --name "${name}-$(date +%s)" \
     --input "$input" \

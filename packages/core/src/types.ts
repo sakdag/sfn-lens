@@ -161,6 +161,8 @@ export interface ExecutionSummary {
   path: string[];
   statesSummary: StateSummary[];
   uiHint: string;
+  /** True when history was capped and may omit middle events. */
+  historyTruncated?: boolean;
 }
 
 /** Full payload for the UI (graph + overlays + redacted metadata). */

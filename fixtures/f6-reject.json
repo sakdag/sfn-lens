@@ -1,0 +1,201 @@
+{
+  "id": "f6-reject",
+  "description": "Choice Route sends fault=reject to Reject Fail state",
+  "faultId": "F6",
+  "execution": {
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f6-reject",
+    "name": "f6-reject",
+    "status": "FAILED",
+    "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
+    "startDate": "2026-11-26T12:00:00.000Z",
+    "stopDate": "2026-11-26T12:00:00.650Z",
+    "error": "Rejected",
+    "cause": "validation rejected"
+  },
+  "definition": {
+    "Comment": "sfn-lens demo — cheap fault-injection workflow",
+    "StartAt": "Validate",
+    "States": {
+      "Validate": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": {
+          "step": "validate",
+          "fault.$": "$.fault"
+        },
+        "Next": "Route"
+      },
+      "Route": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "reject",
+            "Next": "Reject"
+          }
+        ],
+        "Default": "MaybeMap"
+      },
+      "MaybeMap": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "map_partial",
+            "Next": "ProcessMap"
+          }
+        ],
+        "Default": "Process"
+      },
+      "ProcessMap": {
+        "Type": "Map",
+        "ItemsPath": "$.items",
+        "MaxConcurrency": 2,
+        "Iterator": {
+          "StartAt": "MapItem",
+          "States": {
+            "MapItem": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+              "Parameters": {
+                "step": "map_item",
+                "item.$": "$"
+              },
+              "End": true
+            }
+          }
+        },
+        "Next": "Done"
+      },
+      "Process": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": {
+          "step": "process",
+          "fault.$": "$.fault"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 2,
+            "BackoffRate": 1.5
+          }
+        ],
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "HandleError",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Next": "Done"
+      },
+      "HandleError": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "caught_then_fail",
+            "Next": "FailAfterCatch"
+          }
+        ],
+        "Default": "Done"
+      },
+      "FailAfterCatch": {
+        "Type": "Fail",
+        "Error": "CaughtThenFailed",
+        "Cause": "recovered from task error then failed deliberately"
+      },
+      "Reject": {
+        "Type": "Fail",
+        "Error": "Rejected",
+        "Cause": "validation rejected"
+      },
+      "Done": {
+        "Type": "Succeed"
+      }
+    }
+  },
+  "history": [
+    {
+      "id": 1,
+      "type": "ExecutionStarted",
+      "timestamp": "2026-11-26T12:00:00.000Z",
+      "executionStartedEventDetails": {
+        "input": "{\"fault\":\"reject\"}"
+      }
+    },
+    {
+      "id": 2,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.100Z",
+      "stateEnteredEventDetails": {
+        "name": "Validate",
+        "input": "{\"fault\":\"reject\"}"
+      }
+    },
+    {
+      "id": 3,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.400Z",
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"reject\",\"ok\":false}"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T12:00:00.450Z",
+      "stateEnteredEventDetails": {
+        "name": "Route",
+        "input": "{\"fault\":\"reject\",\"ok\":false}"
+      }
+    },
+    {
+      "id": 5,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T12:00:00.500Z",
+      "stateExitedEventDetails": {
+        "name": "Route",
+        "output": "{\"fault\":\"reject\",\"ok\":false}"
+      }
+    },
+    {
+      "id": 6,
+      "type": "FailStateEntered",
+      "timestamp": "2026-11-26T12:00:00.550Z",
+      "stateEnteredEventDetails": {
+        "name": "Reject",
+        "input": "{\"fault\":\"reject\",\"ok\":false}"
+      }
+    },
+    {
+      "id": 7,
+      "type": "FailStateExited",
+      "timestamp": "2026-11-26T12:00:00.600Z",
+      "stateExitedEventDetails": {
+        "name": "Reject"
+      }
+    },
+    {
+      "id": 8,
+      "type": "ExecutionFailed",
+      "timestamp": "2026-11-26T12:00:00.650Z",
+      "executionFailedEventDetails": {
+        "error": "Rejected",
+        "cause": "validation rejected"
+      }
+    }
+  ],
+  "gold": {
+    "failedState": "Reject",
+    "errorClass": "Rejected",
+    "rootCause": "validation rejected"
+  }
+}

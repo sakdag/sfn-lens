@@ -94,9 +94,10 @@ export function App() {
           return;
         }
 
-        if (data.comparison && data.right) {
-          const right = data.right as ShowExecutionPayload;
-          applyExecution(right);
+        // show_execution / compare return compact summary; load graph via app-only tool
+        if (data.view === "execution" && data.executionArn && !data.graph) {
+          const view = await fetchExecutionView(created, data as unknown as ShowExecutionPayload);
+          if (view) applyExecution(view);
           return;
         }
 
@@ -110,6 +111,36 @@ export function App() {
       created.onerror = console.error;
     },
   });
+
+  async function fetchExecutionView(
+    mcp: McpApp,
+    summary: Pick<ShowExecutionPayload, "executionArn" | "name"> & {
+      rightFixtureId?: string;
+      fixtureId?: string;
+    },
+  ): Promise<ShowExecutionPayload | undefined> {
+    const fixtureId =
+      summary.fixtureId ??
+      summary.rightFixtureId ??
+      (summary.executionArn.startsWith("fixture:")
+        ? summary.executionArn.replace(/^fixture:/, "")
+        : isFixtureArn(summary.executionArn)
+          ? summary.name
+          : undefined);
+    try {
+      const result = await mcp.callServerTool({
+        name: "get_execution_view",
+        arguments: fixtureId
+          ? { fixtureId }
+          : { executionArn: summary.executionArn },
+      });
+      return result.structuredContent as ShowExecutionPayload | undefined;
+    } catch (e) {
+      console.error(e);
+      setBanner(e instanceof Error ? e.message : "Failed to load execution view");
+      return undefined;
+    }
+  }
 
   function applyExecution(next: ShowExecutionPayload, opts?: { clearBanner?: boolean; switchToGraph?: boolean }) {
     setPayload(next);
@@ -252,8 +283,15 @@ export function App() {
               ? { fixtureId: item.name }
               : { executionArn: item.executionArn },
         });
-        const data = result.structuredContent as ShowExecutionPayload | undefined;
-        if (data?.graph) applyExecution(data);
+        const summary = result.structuredContent as ShowExecutionPayload | undefined;
+        if (!summary?.executionArn) return;
+        const view = summary.graph
+          ? summary
+          : await fetchExecutionView(mcp, {
+              ...summary,
+              fixtureId: item.fixtureId ?? (item.executionArn.startsWith("fixture:") ? item.name : undefined),
+            });
+        if (view) applyExecution(view);
       } catch (e) {
         console.error(e);
         setBanner(e instanceof Error ? e.message : "Failed to open execution");
@@ -317,14 +355,19 @@ export function App() {
 
   const reloadExecution = useCallback(
     async (mcp: McpApp, executionArn: string) => {
+      const fixtureId = executionArn.startsWith("fixture:")
+        ? executionArn.replace(/^fixture:/, "")
+        : undefined;
       const refreshed = await mcp.callServerTool({
         name: "show_execution",
-        arguments: executionArn.startsWith("fixture:")
-          ? { fixtureId: executionArn.replace(/^fixture:/, "") }
-          : { executionArn },
+        arguments: fixtureId ? { fixtureId } : { executionArn },
       });
-      const data = refreshed.structuredContent as ShowExecutionPayload | undefined;
-      if (data?.graph) applyExecution(data, { switchToGraph: false, clearBanner: false });
+      const summary = refreshed.structuredContent as ShowExecutionPayload | undefined;
+      if (!summary?.executionArn) return undefined;
+      const data = summary.graph
+        ? summary
+        : await fetchExecutionView(mcp, { ...summary, fixtureId });
+      if (data) applyExecution(data, { switchToGraph: false, clearBanner: false });
       return data;
     },
     [],

@@ -1,0 +1,261 @@
+{
+  "id": "f5-caught-then-fail",
+  "description": "Process fails, Catch handles it, then FailAfterCatch fails the execution",
+  "faultId": "F5",
+  "execution": {
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f5-caught-then-fail",
+    "name": "f5-caught-then-fail",
+    "status": "FAILED",
+    "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
+    "startDate": "2026-11-26T12:00:00.000Z",
+    "stopDate": "2026-11-26T12:00:01.200Z",
+    "error": "CaughtThenFailed",
+    "cause": "recovered from task error then failed deliberately"
+  },
+  "definition": {
+    "Comment": "sfn-lens demo — cheap fault-injection workflow",
+    "StartAt": "Validate",
+    "States": {
+      "Validate": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": {
+          "step": "validate",
+          "fault.$": "$.fault"
+        },
+        "Next": "Route"
+      },
+      "Route": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "reject",
+            "Next": "Reject"
+          }
+        ],
+        "Default": "MaybeMap"
+      },
+      "MaybeMap": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "map_partial",
+            "Next": "ProcessMap"
+          }
+        ],
+        "Default": "Process"
+      },
+      "ProcessMap": {
+        "Type": "Map",
+        "ItemsPath": "$.items",
+        "MaxConcurrency": 2,
+        "Iterator": {
+          "StartAt": "MapItem",
+          "States": {
+            "MapItem": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+              "Parameters": {
+                "step": "map_item",
+                "item.$": "$"
+              },
+              "End": true
+            }
+          }
+        },
+        "Next": "Done"
+      },
+      "Process": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": {
+          "step": "process",
+          "fault.$": "$.fault"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 2,
+            "BackoffRate": 1.5
+          }
+        ],
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "HandleError",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Next": "Done"
+      },
+      "HandleError": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "caught_then_fail",
+            "Next": "FailAfterCatch"
+          }
+        ],
+        "Default": "Done"
+      },
+      "FailAfterCatch": {
+        "Type": "Fail",
+        "Error": "CaughtThenFailed",
+        "Cause": "recovered from task error then failed deliberately"
+      },
+      "Reject": {
+        "Type": "Fail",
+        "Error": "Rejected",
+        "Cause": "validation rejected"
+      },
+      "Done": {
+        "Type": "Succeed"
+      }
+    }
+  },
+  "history": [
+    {
+      "id": 1,
+      "type": "ExecutionStarted",
+      "timestamp": "2026-11-26T12:00:00.000Z",
+      "executionStartedEventDetails": {
+        "input": "{\"fault\":\"caught_then_fail\"}"
+      }
+    },
+    {
+      "id": 2,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.100Z",
+      "stateEnteredEventDetails": {
+        "name": "Validate",
+        "input": "{\"fault\":\"caught_then_fail\"}"
+      }
+    },
+    {
+      "id": 3,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.400Z",
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"caught_then_fail\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T12:00:00.450Z",
+      "stateEnteredEventDetails": {
+        "name": "Route",
+        "input": "{\"fault\":\"caught_then_fail\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 5,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T12:00:00.500Z",
+      "stateExitedEventDetails": {
+        "name": "Route",
+        "output": "{\"fault\":\"caught_then_fail\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 6,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T12:00:00.550Z",
+      "stateEnteredEventDetails": {
+        "name": "MaybeMap",
+        "input": "{\"fault\":\"caught_then_fail\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 7,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T12:00:00.600Z",
+      "stateExitedEventDetails": {
+        "name": "MaybeMap",
+        "output": "{\"fault\":\"caught_then_fail\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 8,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.650Z",
+      "stateEnteredEventDetails": {
+        "name": "Process",
+        "input": "{\"fault\":\"caught_then_fail\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 9,
+      "type": "TaskFailed",
+      "timestamp": "2026-11-26T12:00:00.900Z",
+      "taskFailedEventDetails": {
+        "error": "States.TaskFailed",
+        "cause": "{\"errorMessage\":\"injected for catch path\"}"
+      }
+    },
+    {
+      "id": 10,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.950Z",
+      "stateExitedEventDetails": {
+        "name": "Process",
+        "output": "{\"fault\":\"caught_then_fail\",\"ok\":true,\"error\":{\"Error\":\"States.TaskFailed\"}}"
+      }
+    },
+    {
+      "id": 11,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T12:00:01.000Z",
+      "stateEnteredEventDetails": {
+        "name": "HandleError"
+      }
+    },
+    {
+      "id": 12,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T12:00:01.050Z",
+      "stateExitedEventDetails": {
+        "name": "HandleError"
+      }
+    },
+    {
+      "id": 13,
+      "type": "FailStateEntered",
+      "timestamp": "2026-11-26T12:00:01.100Z",
+      "stateEnteredEventDetails": {
+        "name": "FailAfterCatch"
+      }
+    },
+    {
+      "id": 14,
+      "type": "FailStateExited",
+      "timestamp": "2026-11-26T12:00:01.150Z",
+      "stateExitedEventDetails": {
+        "name": "FailAfterCatch"
+      }
+    },
+    {
+      "id": 15,
+      "type": "ExecutionFailed",
+      "timestamp": "2026-11-26T12:00:01.200Z",
+      "executionFailedEventDetails": {
+        "error": "CaughtThenFailed",
+        "cause": "recovered from task error then failed deliberately"
+      }
+    }
+  ],
+  "gold": {
+    "failedState": "FailAfterCatch",
+    "errorClass": "CaughtThenFailed",
+    "rootCause": "failed deliberately"
+  }
+}

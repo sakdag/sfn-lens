@@ -9,7 +9,9 @@ build/
 coverage/
 playwright-report/
 test-results/
-eval/results/
+eval/results/*
+!eval/results/latest.json
+eval/.venv/
 *.log
 .terraform/
 *.tfstate

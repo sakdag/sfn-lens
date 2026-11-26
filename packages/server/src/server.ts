@@ -8,6 +8,7 @@ import {
   buildViewModel,
   compareOverlays,
   layoutGraph,
+  redactErrorCause,
   redactValue,
   type ExecutionViewModel,
   type StateDetail,
@@ -20,6 +21,7 @@ import {
   createSfnClient,
   describeStateMachineDetails,
   extractStateIo,
+  invalidateExecutionCache,
   listRecentExecutions,
   loadLiveExecution,
   redriveExecution,
@@ -40,6 +42,9 @@ const statusFilterSchema = z
   .enum(["RUNNING", "SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED", "PENDING_REDRIVE"])
   .optional();
 
+const readOnly = { readOnlyHint: true as const };
+const destructive = { readOnlyHint: false as const, destructiveHint: true as const };
+
 async function readUiHtml(): Promise<string> {
   const candidates = [
     path.join(DIST_DIR, "ui", "execution.html"),
@@ -56,12 +61,7 @@ async function readUiHtml(): Promise<string> {
   return `<!doctype html><html><body><p>sfn-lens UI not built. Run npm run build.</p></body></html>`;
 }
 
-async function loadExecutionData(input: {
-  executionArn?: string;
-  stateMachineArn?: string;
-  name?: string;
-  fixtureId?: string;
-}): Promise<{
+type LoadedExecution = {
   view: ExecutionViewModel;
   history: import("@sfn-lens/core").HistoryEvent[];
   stateDetails?: Record<string, { input?: unknown; output?: unknown; error?: string; cause?: string }>;
@@ -69,7 +69,16 @@ async function loadExecutionData(input: {
   redriveCount?: number;
   redriveDate?: string;
   redriveStatus?: string;
-}> {
+  historyTruncated?: boolean;
+};
+
+async function loadExecutionData(input: {
+  executionArn?: string;
+  stateMachineArn?: string;
+  name?: string;
+  fixtureId?: string;
+  bypassCache?: boolean;
+}): Promise<LoadedExecution> {
   if (fixtureModeEnabled() || input.fixtureId) {
     const fix = input.fixtureId
       ? await loadFixture(input.fixtureId)
@@ -103,7 +112,7 @@ async function loadExecutionData(input: {
 
   const client = createSfnClient();
   const arn = await resolveExecutionArn(client, input);
-  const live = await loadLiveExecution(client, arn);
+  const live = await loadLiveExecution(client, arn, { bypassCache: input.bypassCache });
   const view = buildViewModel({
     executionArn: live.executionArn,
     name: live.name,
@@ -115,6 +124,7 @@ async function loadExecutionData(input: {
     cause: live.cause,
     definition: live.definition,
     history: live.history,
+    historyTruncated: live.historyTruncated,
   });
   return {
     view,
@@ -123,6 +133,7 @@ async function loadExecutionData(input: {
     redriveCount: live.redriveCount,
     redriveDate: live.redriveDate,
     redriveStatus: live.redriveStatus,
+    historyTruncated: live.historyTruncated,
   };
 }
 
@@ -134,6 +145,9 @@ function toolText(summary: ExecutionViewModel["summary"]): string {
     summary.cause ? `Cause: ${summary.cause}` : null,
     `Path: ${summary.path.join(" → ") || "(none)"}`,
     `Duration: ${summary.durationMs ?? "?"} ms`,
+    summary.historyTruncated
+      ? "Note: history was truncated; failed-state overlay used the execution tail."
+      : null,
     summary.uiHint,
   ];
   return lines.filter(Boolean).join("\n");
@@ -141,6 +155,33 @@ function toolText(summary: ExecutionViewModel["summary"]): string {
 
 function canRedriveStatus(status: string): boolean {
   return ["FAILED", "TIMED_OUT", "ABORTED"].includes(status);
+}
+
+/** Compact payload for the model — no graph / overlay / definition bulk. */
+function compactExecutionContent(loaded: LoadedExecution) {
+  const { view, redriveCount, redriveDate, redriveStatus, historyTruncated } = loaded;
+  return {
+    view: "execution" as const,
+    ...view.summary,
+    historyTruncated: historyTruncated ?? view.summary.historyTruncated,
+    redriveCount: redriveCount ?? 0,
+    redriveDate,
+    redriveStatus,
+    capabilities: serverCapabilities(),
+    redrivable:
+      canRedriveStatus(view.summary.status) && redriveStatus !== "NOT_REDRIVABLE",
+  };
+}
+
+/** Full UI payload (graph/overlay/definition) — app-only via get_execution_view. */
+function uiExecutionContent(loaded: LoadedExecution) {
+  const compact = compactExecutionContent(loaded);
+  return {
+    ...compact,
+    graph: layoutGraph(loaded.view.graph),
+    overlay: loaded.view.overlay,
+    definitionText: loaded.definitionText,
+  };
 }
 
 export function createServer(): McpServer {
@@ -155,13 +196,14 @@ export function createServer(): McpServer {
     {
       title: "Show Step Functions execution",
       description:
-        "Load an AWS Step Functions execution and open the in-chat console (graph, executions list, definition, redrive). This is the only tool that renders the UI — call it once per execution you want to show. Prefer this over dumping raw GetExecutionHistory.",
+        "Load an AWS Step Functions execution and open the in-chat console (graph, executions list, definition, redrive). This is the only tool that renders the UI — call it once per execution you want to show. Prefer this over dumping raw GetExecutionHistory. Returns a compact summary for the model; the UI loads graph data separately.",
       inputSchema: z.object({
         executionArn: z.string().optional().describe("Full execution ARN"),
         stateMachineArn: z.string().optional().describe("State machine ARN (with name)"),
         name: z.string().optional().describe("Execution name"),
         fixtureId: z.string().optional().describe("Fixture id when using fixture mode"),
       }),
+      annotations: readOnly,
       _meta: {
         ui: {
           resourceUri: RESOURCE_URI,
@@ -170,24 +212,41 @@ export function createServer(): McpServer {
       },
     },
     async (args) => {
-      const { view, definitionText, redriveCount, redriveDate, redriveStatus } =
-        await loadExecutionData(args);
-      const laidOut = layoutGraph(view.graph);
-      const structuredContent = {
-        view: "execution" as const,
-        ...view.summary,
-        graph: laidOut,
-        overlay: view.overlay,
-        definitionText,
-        redriveCount: redriveCount ?? 0,
-        redriveDate,
-        redriveStatus,
-        capabilities: serverCapabilities(),
-        redrivable:
-          canRedriveStatus(view.summary.status) && redriveStatus !== "NOT_REDRIVABLE",
-      };
+      const loaded = await loadExecutionData(args);
+      const structuredContent = compactExecutionContent(loaded);
       return {
-        content: [{ type: "text", text: toolText(view.summary) }],
+        content: [{ type: "text", text: toolText(loaded.view.summary) }],
+        structuredContent,
+      };
+    },
+  );
+
+  registerAppTool(
+    server,
+    "get_execution_view",
+    {
+      title: "Get execution view (UI)",
+      description:
+        "Return graph, overlay, and definition for the in-chat console. App-only — not for the model.",
+      inputSchema: z.object({
+        executionArn: z.string().optional(),
+        stateMachineArn: z.string().optional(),
+        name: z.string().optional(),
+        fixtureId: z.string().optional(),
+      }),
+      annotations: readOnly,
+      _meta: {
+        ui: {
+          resourceUri: RESOURCE_URI,
+          visibility: ["app"],
+        },
+      },
+    },
+    async (args) => {
+      const loaded = await loadExecutionData(args);
+      const structuredContent = uiExecutionContent(loaded);
+      return {
+        content: [{ type: "text", text: `UI view for ${loaded.view.summary.name}` }],
         structuredContent,
       };
     },
@@ -206,6 +265,7 @@ export function createServer(): McpServer {
         leftFixtureId: z.string().optional(),
         rightFixtureId: z.string().optional(),
       }),
+      annotations: readOnly,
       _meta: {
         ui: {
           resourceUri: RESOURCE_URI,
@@ -228,24 +288,12 @@ export function createServer(): McpServer {
         left: left.view.overlay,
         right: right.view.overlay,
       });
+      // Model gets comparison + compact right summary; UI loads graph via get_execution_view
       const structuredContent = {
-        view: "execution" as const,
+        ...compactExecutionContent(right),
         comparison,
-        left: {
-          summary: left.view.summary,
-          graph: layoutGraph(left.view.graph),
-          overlay: left.view.overlay,
-        },
-        right: {
-          summary: right.view.summary,
-          graph: layoutGraph(right.view.graph),
-          overlay: right.view.overlay,
-          ...right.view.summary,
-          definitionText: right.definitionText,
-          capabilities: serverCapabilities(),
-          redrivable: canRedriveStatus(right.view.summary.status),
-        },
-        capabilities: serverCapabilities(),
+        rightExecutionArn: right.view.summary.executionArn,
+        rightFixtureId: args.rightFixtureId,
       };
       return {
         content: [{ type: "text", text: comparison.summaryText }],
@@ -264,6 +312,7 @@ export function createServer(): McpServer {
       inputSchema: z.object({
         maxResults: z.number().int().min(1).max(100).optional(),
       }),
+      annotations: readOnly,
       _meta: {
         ui: { visibility: ["model"] },
       },
@@ -312,6 +361,7 @@ export function createServer(): McpServer {
         maxResults: z.number().int().min(1).max(100).optional(),
         nextToken: z.string().optional(),
       }),
+      annotations: readOnly,
       _meta: {
         ui: {
           visibility: ["model", "app"],
@@ -392,6 +442,7 @@ export function createServer(): McpServer {
         executionArn: z.string().optional(),
         fixtureId: z.string().optional(),
       }),
+      annotations: readOnly,
       _meta: {
         ui: {
           visibility: ["model", "app"],
@@ -459,6 +510,7 @@ export function createServer(): McpServer {
         stateName: z.string(),
         name: z.string().optional(),
       }),
+      annotations: readOnly,
       _meta: {
         ui: {
           resourceUri: RESOURCE_URI,
@@ -473,6 +525,9 @@ export function createServer(): McpServer {
       const fromFixture = stateDetails?.[args.stateName];
       const node = view.graph.nodes.find((n) => n.name === args.stateName);
 
+      const rawError = overlay?.error ?? fromFixture?.error ?? fromHistory.error;
+      const rawCause = overlay?.cause ?? fromFixture?.cause ?? fromHistory.cause;
+
       const detail: StateDetail = {
         name: args.stateName,
         type: node?.type,
@@ -480,15 +535,16 @@ export function createServer(): McpServer {
         enteredAt: overlay?.enteredAt,
         exitedAt: overlay?.exitedAt,
         durationMs: overlay?.durationMs,
-        error: overlay?.error ?? fromFixture?.error ?? fromHistory.error,
-        cause: overlay?.cause ?? fromFixture?.cause ?? fromHistory.cause,
+        error: rawError,
+        cause: redactErrorCause(rawCause),
         retryCount: overlay?.retryCount ?? 0,
         caught: overlay?.caught ?? false,
         input: redactValue(fromFixture?.input ?? fromHistory.input),
         output: redactValue(fromFixture?.output ?? fromHistory.output),
         retries: fromHistory.retries.map((r) => ({
-          ...r,
-          cause: r.cause ? String(redactValue({ cause: r.cause })).slice(0, 200) : undefined,
+          error: r.error,
+          cause: redactErrorCause(r.cause),
+          at: r.at,
         })),
       };
 
@@ -512,6 +568,7 @@ export function createServer(): McpServer {
         offset: z.number().int().min(0).default(0),
         limit: z.number().int().min(1).max(200).default(50),
       }),
+      annotations: readOnly,
       _meta: {
         ui: {
           resourceUri: RESOURCE_URI,
@@ -520,7 +577,7 @@ export function createServer(): McpServer {
       },
     },
     async (args) => {
-      const { history } = await loadExecutionData(args);
+      const { history, historyTruncated } = await loadExecutionData(args);
       const slice = history.slice(args.offset, args.offset + args.limit).map((e) => ({
         id: e.id,
         type: e.type,
@@ -530,13 +587,16 @@ export function createServer(): McpServer {
         content: [
           {
             type: "text",
-            text: `events ${args.offset}-${args.offset + slice.length} of ${history.length}`,
+            text: `events ${args.offset}-${args.offset + slice.length} of ${history.length}${
+              historyTruncated ? " (truncated)" : ""
+            }`,
           },
         ],
         structuredContent: {
           total: history.length,
           offset: args.offset,
           limit: args.limit,
+          truncated: historyTruncated ?? false,
           events: slice,
         },
       };
@@ -556,6 +616,7 @@ export function createServer(): McpServer {
           .boolean()
           .describe("Must be true after the user confirms in the UI"),
       }),
+      annotations: destructive,
       _meta: {
         ui: {
           resourceUri: RESOURCE_URI,
@@ -575,6 +636,7 @@ export function createServer(): McpServer {
       if (fixtureModeEnabled()) {
         throw new Error("Redrive is not available in fixture mode.");
       }
+      invalidateExecutionCache(args.executionArn);
       const client = createSfnClient();
       const result = await redriveExecution(client, args.executionArn);
       return {

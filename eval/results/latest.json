@@ -1,0 +1,304 @@
+{
+  "model": "eu.amazon.nova-micro-v1:0",
+  "rows": [
+    {
+      "fixture": "f1-lambda-error",
+      "condition": "summary",
+      "pred": {
+        "failedState": "Process",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "injected lambda failure"
+      },
+      "gold": {
+        "failedState": "Process",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "injected lambda failure"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 277,
+      "outputTokens": 34
+    },
+    {
+      "fixture": "f1-lambda-error",
+      "condition": "raw",
+      "pred": {
+        "failedState": "Process",
+        "errorClass": "RuntimeError",
+        "rootCause": "injected lambda failure"
+      },
+      "gold": {
+        "failedState": "Process",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "injected lambda failure"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": false,
+        "root_cause_ok": true
+      },
+      "inputTokens": 607,
+      "outputTokens": 32
+    },
+    {
+      "fixture": "f2-timeout",
+      "condition": "summary",
+      "pred": {
+        "failedState": "Process",
+        "errorClass": "States.Timeout",
+        "rootCause": "Task timed out after 3.00 seconds"
+      },
+      "gold": {
+        "failedState": "Process",
+        "errorClass": "States.Timeout",
+        "rootCause": "timed out"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 455,
+      "outputTokens": 38
+    },
+    {
+      "fixture": "f2-timeout",
+      "condition": "raw",
+      "pred": {
+        "failedState": "Process",
+        "errorClass": "Timeout",
+        "rootCause": "Task timed out after 3.00 seconds"
+      },
+      "gold": {
+        "failedState": "Process",
+        "errorClass": "States.Timeout",
+        "rootCause": "timed out"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 1157,
+      "outputTokens": 36
+    },
+    {
+      "fixture": "f3-throttle",
+      "condition": "summary",
+      "pred": {
+        "failedState": "Process",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "Rate exceeded"
+      },
+      "gold": {
+        "failedState": "Process",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "Rate exceeded"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 461,
+      "outputTokens": 31
+    },
+    {
+      "fixture": "f3-throttle",
+      "condition": "raw",
+      "pred": {
+        "failedState": "Process",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "Rate exceeded"
+      },
+      "gold": {
+        "failedState": "Process",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "Rate exceeded"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 1375,
+      "outputTokens": 31
+    },
+    {
+      "fixture": "f4-map-partial",
+      "condition": "summary",
+      "pred": {
+        "failedState": "MapItem",
+        "errorClass": "RuntimeError",
+        "rootCause": "map item failed: {\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"}"
+      },
+      "gold": {
+        "failedState": "MapItem",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "map item failed"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": false,
+        "root_cause_ok": true
+      },
+      "inputTokens": 471,
+      "outputTokens": 54
+    },
+    {
+      "fixture": "f4-map-partial",
+      "condition": "raw",
+      "pred": {
+        "failedState": "MapState",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "RuntimeError: map item failed: {\\\"id\\\":2,\\\"fail\\\":true,\\\"claimantEmail\\\":\\\"map-fail@example.com\\\"}"
+      },
+      "gold": {
+        "failedState": "MapItem",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "map item failed"
+      },
+      "score": {
+        "failed_state_ok": false,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 1699,
+      "outputTokens": 65
+    },
+    {
+      "fixture": "f4-map-large",
+      "condition": "summary",
+      "pred": {
+        "failedState": "MapItem",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "map item failed: {\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}"
+      },
+      "gold": {
+        "failedState": "MapItem",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "map item failed"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 482,
+      "outputTokens": 55
+    },
+    {
+      "fixture": "f4-map-large",
+      "condition": "raw",
+      "pred": {
+        "failedState": "MapItem",
+        "errorClass": "ExecutionFailed",
+        "rootCause": "Item with id 79 failed"
+      },
+      "gold": {
+        "failedState": "MapItem",
+        "errorClass": "States.TaskFailed",
+        "rootCause": "map item failed"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": false,
+        "root_cause_ok": false
+      },
+      "inputTokens": 5538,
+      "outputTokens": 39
+    },
+    {
+      "fixture": "f5-caught-then-fail",
+      "condition": "summary",
+      "pred": {
+        "failedState": "FailAfterCatch",
+        "errorClass": "CaughtThenFailed",
+        "rootCause": "recovered from task error then failed deliberately"
+      },
+      "gold": {
+        "failedState": "FailAfterCatch",
+        "errorClass": "CaughtThenFailed",
+        "rootCause": "failed deliberately"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 458,
+      "outputTokens": 39
+    },
+    {
+      "fixture": "f5-caught-then-fail",
+      "condition": "raw",
+      "pred": {
+        "failedState": "FailAfterCatch",
+        "errorClass": "CaughtThenFailed",
+        "rootCause": "recovered from task error then failed deliberately"
+      },
+      "gold": {
+        "failedState": "FailAfterCatch",
+        "errorClass": "CaughtThenFailed",
+        "rootCause": "failed deliberately"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 1097,
+      "outputTokens": 39
+    },
+    {
+      "fixture": "f6-reject",
+      "condition": "summary",
+      "pred": {
+        "failedState": "Reject",
+        "errorClass": "Validation",
+        "rootCause": "validation rejected"
+      },
+      "gold": {
+        "failedState": "Reject",
+        "errorClass": "Rejected",
+        "rootCause": "validation rejected"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": false,
+        "root_cause_ok": true
+      },
+      "inputTokens": 355,
+      "outputTokens": 28
+    },
+    {
+      "fixture": "f6-reject",
+      "condition": "raw",
+      "pred": {
+        "failedState": "Reject",
+        "errorClass": "Task",
+        "rootCause": "validation rejected"
+      },
+      "gold": {
+        "failedState": "Reject",
+        "errorClass": "Rejected",
+        "rootCause": "validation rejected"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": false,
+        "root_cause_ok": true
+      },
+      "inputTokens": 570,
+      "outputTokens": 28
+    }
+  ],
+  "totals": {
+    "inputTokens": 15002,
+    "outputTokens": 549,
+    "costUsd": 0.000602
+  }
+}

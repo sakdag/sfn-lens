@@ -74,13 +74,12 @@ Ask Claude to show fixture `f1-lambda-error`.
 
 ## Sample workflow
 
-A small Terraform demo in `eu-north-1` plus a fault-injection script, useful for trying the UI end to end:
+A small Terraform demo (default region `eu-north-1`) plus a fault-injection script, useful for trying the UI end to end:
 
 ```bash
 cd demo/terraform
-AWS_PROFILE=personal terraform init
-AWS_PROFILE=personal terraform apply
-export STATE_MACHINE_ARN=$(AWS_PROFILE=personal terraform output -raw state_machine_arn)
+terraform init && terraform apply
+export STATE_MACHINE_ARN=$(terraform output -raw state_machine_arn)
 bash ../scripts/inject_faults.sh
 ```
 
@@ -90,11 +89,11 @@ bash ../scripts/inject_faults.sh
 
 | Env | Default | Notes |
 | --- | --- | --- |
-| `AWS_PROFILE` | `personal` | Shared credentials profile |
-| `AWS_REGION` | `eu-north-1` | Step Functions region |
+| `AWS_PROFILE` | — | Optional; SDK default credential chain if unset (env keys, SSO, shared config) |
+| `AWS_REGION` / `AWS_DEFAULT_REGION` | — | Optional; SDK / shared-config region if unset |
 | `SFN_LENS_MODE` | `live` | `live` or `fixture` |
 | `SFN_LENS_FIXTURE_DIR` | `fixtures/` | Offline recordings |
-| `SFN_LENS_REDACT_JSONPATHS` | — | e.g. `$.customer.ssn,$.claimant.email` |
+| `SFN_LENS_REDACT_JSONPATHS` | — | e.g. `$.customer.ssn,$.items[*].ssn` |
 | `SFN_LENS_ALLOW_REDRIVE` | off | Set `true` to enable redrive |
 
 Read IAM: `states:List*`, `Describe*`, `GetExecutionHistory`.  
@@ -108,10 +107,12 @@ More on trust boundaries: [`docs/SECURITY.md`](docs/SECURITY.md).
 npm install
 npm run build
 npm test
+npm run typecheck
+npm run eval:dry
 npm run start:stdio
 ```
 
-TypeScript throughout (MCP Apps SDK + UI in one toolchain).
+TypeScript throughout (MCP Apps SDK + UI in one toolchain). CI runs build, typecheck, tests, and the eval dry-run.
 
 ## Licence
 

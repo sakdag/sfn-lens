@@ -8,6 +8,7 @@ import type {
 } from "./types.js";
 import { aslToGraph } from "./asl-graph.js";
 import { overlayFromHistory } from "./history-overlay.js";
+import { redactErrorCause } from "./redaction.js";
 import type { HistoryEvent } from "./types.js";
 
 const UI_HINT =
@@ -22,6 +23,7 @@ export function buildExecutionSummary(params: {
   stopDate?: string;
   overlay: ExecutionOverlay;
   graph: WorkflowGraph;
+  historyTruncated?: boolean;
 }): ExecutionSummary {
   const { overlay, graph } = params;
   const statesSummary: StateSummary[] = graph.nodes
@@ -56,7 +58,8 @@ export function buildExecutionSummary(params: {
   }
 
   const retryCount = Object.values(overlay.states).reduce((a, s) => a + s.retryCount, 0);
-  const cause = truncate(overlay.cause ?? overlay.states[overlay.failedState ?? ""]?.cause, 400);
+  const rawCause = overlay.cause ?? overlay.states[overlay.failedState ?? ""]?.cause;
+  const cause = truncate(redactErrorCause(rawCause), 400);
   const error = overlay.error ?? overlay.states[overlay.failedState ?? ""]?.error;
 
   return {
@@ -74,6 +77,7 @@ export function buildExecutionSummary(params: {
     path: overlay.path,
     statesSummary,
     uiHint: UI_HINT,
+    historyTruncated: params.historyTruncated || undefined,
   };
 }
 
@@ -88,15 +92,18 @@ export function buildViewModel(params: {
   cause?: string;
   definition: AslDefinition;
   history: HistoryEvent[];
+  historyTruncated?: boolean;
 }): ExecutionViewModel {
   const graph = aslToGraph(params.definition);
-  const overlay = overlayFromHistory(params.history, {
-    status: params.status,
-    startDate: params.startDate,
-    stopDate: params.stopDate,
-    error: params.error,
-    cause: params.cause,
-  });
+  const overlay = redactOverlay(
+    overlayFromHistory(params.history, {
+      status: params.status,
+      startDate: params.startDate,
+      stopDate: params.stopDate,
+      error: params.error,
+      cause: params.cause,
+    }),
+  );
   const summary = buildExecutionSummary({
     executionArn: params.executionArn,
     name: params.name,
@@ -106,12 +113,28 @@ export function buildViewModel(params: {
     stopDate: params.stopDate,
     overlay,
     graph,
+    historyTruncated: params.historyTruncated,
   });
   return {
     summary,
     graph,
     overlay,
     definitionComment: params.definition.Comment,
+  };
+}
+
+function redactOverlay(overlay: ExecutionOverlay): ExecutionOverlay {
+  const states = { ...overlay.states };
+  for (const [name, s] of Object.entries(states)) {
+    states[name] = {
+      ...s,
+      cause: redactErrorCause(s.cause),
+    };
+  }
+  return {
+    ...overlay,
+    cause: redactErrorCause(overlay.cause),
+    states,
   };
 }
 

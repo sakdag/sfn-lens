@@ -8,7 +8,7 @@
 
 ## Credentials
 
-- Live mode uses the local AWS default provider chain (`AWS_PROFILE`, typically `personal`).
+- Live mode uses the local AWS SDK default credential chain (env vars, shared config / SSO, or `AWS_PROFILE` if you set it).
 - Prefer a least-privilege IAM principal with only:
 
   - `states:ListStateMachines`

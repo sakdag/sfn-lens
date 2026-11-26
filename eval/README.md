@@ -1,12 +1,19 @@
 # Eval harness
 
-Python script (Bedrock Nova Micro) that scores diagnosis quality for summary vs raw history.
+Compares diagnosis quality when the model sees the real `ExecutionSummary` (from `@sfn-lens/core`) vs truncated raw `GetExecutionHistory`.
 
 ```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-AWS_PROFILE=personal AWS_REGION=eu-north-1 python diagnose.py --limit 6
+npm run build:core
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt   # boto3
+
+# Cost estimate + summary sizes (no Bedrock calls)
+npm run eval:dry
+
+# Live Bedrock Nova Micro (uses AWS default credential chain)
+npm run eval -- --limit 7
 ```
 
-Cost guard: the script refuses to run if the estimated upper bound exceeds `$1.00`.
+Cost guard: refuses to run if the estimated upper bound exceeds `$1.00`.
+
+Results land in `eval/results/latest.json`.

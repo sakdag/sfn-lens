@@ -1,0 +1,307 @@
+{
+  "id": "f4-map-partial",
+  "description": "Map ProcessMap fails on one item",
+  "faultId": "F4",
+  "execution": {
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f4-map-partial",
+    "name": "f4-map-partial",
+    "status": "FAILED",
+    "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
+    "startDate": "2026-11-26T12:00:00.000Z",
+    "stopDate": "2026-11-26T12:00:01.350Z",
+    "error": "States.TaskFailed",
+    "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"map item failed: {\\\"id\\\":2,\\\"fail\\\":true,\\\"claimantEmail\\\":\\\"map-fail@example.com\\\"}\"}"
+  },
+  "definition": {
+    "Comment": "sfn-lens demo — cheap fault-injection workflow",
+    "StartAt": "Validate",
+    "States": {
+      "Validate": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": {
+          "step": "validate",
+          "fault.$": "$.fault"
+        },
+        "Next": "Route"
+      },
+      "Route": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "reject",
+            "Next": "Reject"
+          }
+        ],
+        "Default": "MaybeMap"
+      },
+      "MaybeMap": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "map_partial",
+            "Next": "ProcessMap"
+          }
+        ],
+        "Default": "Process"
+      },
+      "ProcessMap": {
+        "Type": "Map",
+        "ItemsPath": "$.items",
+        "MaxConcurrency": 2,
+        "Iterator": {
+          "StartAt": "MapItem",
+          "States": {
+            "MapItem": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+              "Parameters": {
+                "step": "map_item",
+                "item.$": "$"
+              },
+              "End": true
+            }
+          }
+        },
+        "Next": "Done"
+      },
+      "Process": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": {
+          "step": "process",
+          "fault.$": "$.fault"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 2,
+            "BackoffRate": 1.5
+          }
+        ],
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "HandleError",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Next": "Done"
+      },
+      "HandleError": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "caught_then_fail",
+            "Next": "FailAfterCatch"
+          }
+        ],
+        "Default": "Done"
+      },
+      "FailAfterCatch": {
+        "Type": "Fail",
+        "Error": "CaughtThenFailed",
+        "Cause": "recovered from task error then failed deliberately"
+      },
+      "Reject": {
+        "Type": "Fail",
+        "Error": "Rejected",
+        "Cause": "validation rejected"
+      },
+      "Done": {
+        "Type": "Succeed"
+      }
+    }
+  },
+  "history": [
+    {
+      "id": 1,
+      "type": "ExecutionStarted",
+      "timestamp": "2026-11-26T12:00:00.000Z",
+      "executionStartedEventDetails": {
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":1},{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"},{\"id\":3}]}"
+      }
+    },
+    {
+      "id": 2,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.100Z",
+      "stateEnteredEventDetails": {
+        "name": "Validate",
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":1},{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"},{\"id\":3}]}"
+      }
+    },
+    {
+      "id": 3,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.400Z",
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"map_partial\",\"items\":[{\"id\":1},{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"},{\"id\":3}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T12:00:00.450Z",
+      "stateEnteredEventDetails": {
+        "name": "Route",
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":1},{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"},{\"id\":3}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 5,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T12:00:00.500Z",
+      "stateExitedEventDetails": {
+        "name": "Route",
+        "output": "{\"fault\":\"map_partial\",\"items\":[{\"id\":1},{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"},{\"id\":3}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 6,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T12:00:00.550Z",
+      "stateEnteredEventDetails": {
+        "name": "MaybeMap",
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":1},{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"},{\"id\":3}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 7,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T12:00:00.600Z",
+      "stateExitedEventDetails": {
+        "name": "MaybeMap",
+        "output": "{\"fault\":\"map_partial\",\"items\":[{\"id\":1},{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"},{\"id\":3}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 8,
+      "type": "MapStateEntered",
+      "timestamp": "2026-11-26T12:00:00.650Z",
+      "stateEnteredEventDetails": {
+        "name": "ProcessMap",
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":1},{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"},{\"id\":3}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 9,
+      "type": "MapStateStarted",
+      "timestamp": "2026-11-26T12:00:00.700Z",
+      "mapStateStartedEventDetails": {
+        "length": 3
+      }
+    },
+    {
+      "id": 10,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:00.750Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 0
+      }
+    },
+    {
+      "id": 11,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.800Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":1}"
+      }
+    },
+    {
+      "id": 12,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.900Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":1}}"
+      }
+    },
+    {
+      "id": 13,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:00.950Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 0
+      }
+    },
+    {
+      "id": 14,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.000Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 1
+      }
+    },
+    {
+      "id": 15,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.050Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"}"
+      }
+    },
+    {
+      "id": 16,
+      "type": "TaskFailed",
+      "timestamp": "2026-11-26T12:00:01.200Z",
+      "taskFailedEventDetails": {
+        "error": "States.TaskFailed",
+        "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"map item failed: {\\\"id\\\":2,\\\"fail\\\":true,\\\"claimantEmail\\\":\\\"map-fail@example.com\\\"}\"}"
+      }
+    },
+    {
+      "id": 17,
+      "type": "MapIterationFailed",
+      "timestamp": "2026-11-26T12:00:01.250Z",
+      "mapIterationFailedEventDetails": {
+        "name": "ProcessMap",
+        "index": 1
+      }
+    },
+    {
+      "id": 18,
+      "type": "MapStateFailed",
+      "timestamp": "2026-11-26T12:00:01.300Z"
+    },
+    {
+      "id": 19,
+      "type": "ExecutionFailed",
+      "timestamp": "2026-11-26T12:00:01.350Z",
+      "executionFailedEventDetails": {
+        "error": "States.TaskFailed",
+        "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"map item failed: {\\\"id\\\":2,\\\"fail\\\":true,\\\"claimantEmail\\\":\\\"map-fail@example.com\\\"}\"}"
+      }
+    }
+  ],
+  "stateDetails": {
+    "MapItem": {
+      "input": {
+        "id": 2,
+        "fail": true,
+        "claimantEmail": "map-fail@example.com"
+      },
+      "error": "States.TaskFailed",
+      "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"map item failed: {\\\"id\\\":2,\\\"fail\\\":true,\\\"claimantEmail\\\":\\\"map-fail@example.com\\\"}\"}"
+    }
+  },
+  "gold": {
+    "failedState": "MapItem",
+    "errorClass": "States.TaskFailed",
+    "rootCause": "map item failed"
+  }
+}

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { aslToGraph } from "./asl-graph.js";
 import { overlayFromHistory } from "./history-overlay.js";
 import { buildViewModel } from "./summary.js";
-import { redactValue } from "./redaction.js";
+import { pathPatternToRegExp, redactErrorCause, redactValue } from "./redaction.js";
 import { compareOverlays } from "./compare.js";
 import type { AslDefinition, HistoryEvent } from "./types.js";
 
@@ -95,6 +95,33 @@ describe("overlay + summary", () => {
     assert.equal(vm.overlay.states["Process"]?.status, "FAILED");
     assert.match(vm.summary.uiHint, /click/i);
   });
+
+  it("flags historyTruncated on the summary", () => {
+    const vm = buildViewModel({
+      executionArn: "arn:aws:states:eu-north-1:123:execution:demo:run1",
+      name: "run1",
+      status: "FAILED",
+      stateMachineArn: "arn:aws:states:eu-north-1:123:stateMachine:demo",
+      definition: sampleDef,
+      history: [
+        {
+          id: 1,
+          type: "TaskStateEntered",
+          timestamp: "2026-01-01T00:00:00Z",
+          stateEnteredEventDetails: { name: "Process" },
+        },
+        {
+          id: 2,
+          type: "TaskFailed",
+          timestamp: "2026-01-01T00:00:01Z",
+          taskFailedEventDetails: { error: "States.TaskFailed", cause: "tail" },
+        },
+      ],
+      historyTruncated: true,
+    });
+    assert.equal(vm.summary.historyTruncated, true);
+    assert.equal(vm.summary.failedState, "Process");
+  });
 });
 
 describe("redaction", () => {
@@ -106,6 +133,52 @@ describe("redaction", () => {
     assert.equal(out.customer.email, "[REDACTED]");
     assert.equal(out.customer.name, "[REDACTED]");
     assert.equal(out.ok, true);
+  });
+
+  it("matches wildcard JSONPath $.items[*].ssn (escaped $)", () => {
+    const re = pathPatternToRegExp("$.items[*].ssn");
+    assert.equal(re.test("$.items[0].ssn"), true);
+    assert.equal(re.test("$.items[12].ssn"), true);
+    assert.equal(re.test("$.items.ssn"), false);
+
+    const out = redactValue(
+      { items: [{ ssn: "111-22-3333", id: 1 }, { ssn: "999-88-7777", id: 2 }] },
+      { jsonPaths: ["$.items[*].ssn"] },
+    ) as { items: Array<{ ssn: string; id: number }> };
+    assert.equal(out.items[0]!.ssn, "[REDACTED]");
+    assert.equal(out.items[1]!.ssn, "[REDACTED]");
+    assert.equal(out.items[0]!.id, 1);
+  });
+
+  it("redacts claimantEmail via email key matching", () => {
+    const out = redactValue({
+      claimantEmail: "ada@example.com",
+      name: "Ada",
+    }) as { claimantEmail: string; name: string };
+    assert.equal(out.claimantEmail, "[REDACTED]");
+    assert.equal(out.name, "Ada");
+  });
+
+  it("redacts JSON Lambda causes without [object Object]", () => {
+    const cause = JSON.stringify({
+      errorType: "RuntimeError",
+      errorMessage: "boom",
+      claimantEmail: "x@y.z",
+      customer: { ssn: "123-45-6789" },
+    });
+    const redacted = redactErrorCause(cause);
+    assert.ok(redacted);
+    assert.equal(redacted!.includes("[object Object]"), false);
+    assert.equal(redacted!.includes("x@y.z"), false);
+    assert.equal(redacted!.includes("123-45-6789"), false);
+    assert.match(redacted!, /REDACTED/);
+    const parsed = JSON.parse(redacted!);
+    assert.equal(parsed.errorMessage, "boom");
+  });
+
+  it("scrubs emails in plain-text causes", () => {
+    const out = redactErrorCause("failed for user ada@example.com");
+    assert.equal(out, "failed for user [REDACTED]");
   });
 });
 

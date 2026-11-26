@@ -11,11 +11,45 @@ import {
 import type { AslDefinition, HistoryEvent as CoreHistoryEvent } from "@sfn-lens/core";
 import { randomUUID } from "node:crypto";
 
+const HISTORY_HARD_CAP = 5000;
+const EXECUTION_CACHE_TTL_MS = 60_000;
+
+export type LiveExecution = {
+  executionArn: string;
+  name: string;
+  status: string;
+  stateMachineArn: string;
+  startDate?: string;
+  stopDate?: string;
+  error?: string;
+  cause?: string;
+  input?: string;
+  output?: string;
+  redriveCount: number;
+  redriveDate?: string;
+  redriveStatus?: string;
+  definition: AslDefinition;
+  history: CoreHistoryEvent[];
+  historyTruncated: boolean;
+};
+
+type CacheEntry = { fetchedAt: number; value: LiveExecution };
+
+const executionCache = new Map<string, CacheEntry>();
+
+/**
+ * Use the AWS SDK default credential + region chain.
+ * Do not force AWS_PROFILE or a hard-coded region — that breaks SSO, env keys,
+ * and anyone whose profile is not named "personal".
+ */
 export function createSfnClient(): SFNClient {
-  const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "eu-north-1";
-  // Default provider chain reads AWS_PROFILE (default to personal for this tool).
-  if (!process.env.AWS_PROFILE) process.env.AWS_PROFILE = "personal";
-  return new SFNClient({ region });
+  const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION;
+  return new SFNClient(region ? { region } : {});
+}
+
+export function invalidateExecutionCache(executionArn?: string): void {
+  if (executionArn) executionCache.delete(executionArn);
+  else executionCache.clear();
 }
 
 export async function resolveExecutionArn(
@@ -26,7 +60,6 @@ export async function resolveExecutionArn(
   if (!input.stateMachineArn || !input.name) {
     throw new Error("Provide executionArn, or both stateMachineArn and name");
   }
-  // List and find by name (API has no GetExecution by name alone without ARN)
   const listed = await client.send(
     new ListExecutionsCommand({
       stateMachineArn: input.stateMachineArn,
@@ -43,23 +76,15 @@ export async function resolveExecutionArn(
 export async function loadLiveExecution(
   client: SFNClient,
   executionArn: string,
-): Promise<{
-  executionArn: string;
-  name: string;
-  status: string;
-  stateMachineArn: string;
-  startDate?: string;
-  stopDate?: string;
-  error?: string;
-  cause?: string;
-  input?: string;
-  output?: string;
-  redriveCount: number;
-  redriveDate?: string;
-  redriveStatus?: string;
-  definition: AslDefinition;
-  history: CoreHistoryEvent[];
-}> {
+  opts?: { bypassCache?: boolean },
+): Promise<LiveExecution> {
+  if (!opts?.bypassCache) {
+    const hit = executionCache.get(executionArn);
+    if (hit && Date.now() - hit.fetchedAt < EXECUTION_CACHE_TTL_MS) {
+      return hit.value;
+    }
+  }
+
   const desc = await client.send(new DescribeExecutionCommand({ executionArn }));
   if (!desc.stateMachineArn || !desc.name || !desc.status) {
     throw new Error(`Incomplete DescribeExecution for ${executionArn}`);
@@ -71,9 +96,9 @@ export async function loadLiveExecution(
   if (!sm.definition) throw new Error("State machine definition missing");
   const definition = JSON.parse(sm.definition) as AslDefinition;
 
-  const history = await fetchAllHistory(client, executionArn);
+  const { events, truncated } = await fetchHistoryPreferTail(client, executionArn);
 
-  return {
+  const value: LiveExecution = {
     executionArn,
     name: desc.name,
     status: desc.status,
@@ -88,8 +113,12 @@ export async function loadLiveExecution(
     redriveDate: desc.redriveDate?.toISOString(),
     redriveStatus: desc.redriveStatus,
     definition,
-    history: history.map(toCoreEvent),
+    history: events.map(toCoreEvent),
+    historyTruncated: truncated,
   };
+
+  executionCache.set(executionArn, { fetchedAt: Date.now(), value });
+  return value;
 }
 
 export type ExecutionListItem = {
@@ -123,7 +152,6 @@ export async function listRecentExecutions(
     stateMachineArn = first;
   }
 
-  // Fetch a wider page when name-filtering client-side.
   const apiMax = params.nameContains
     ? Math.min(100, Math.max(params.maxResults ?? 50, 50))
     : (params.maxResults ?? 25);
@@ -205,6 +233,7 @@ export async function redriveExecution(
   client: SFNClient,
   executionArn: string,
 ): Promise<{ executionArn: string; redriveDate: string }> {
+  invalidateExecutionCache(executionArn);
   const out = await client.send(
     new RedriveExecutionCommand({
       executionArn,
@@ -217,13 +246,54 @@ export async function redriveExecution(
   };
 }
 
-async function fetchAllHistory(
+/**
+ * Fetch history preferring the tail so large Map runs still include the failure.
+ * When the hard cap truncates, also merge a forward page (start) and set truncated.
+ */
+export async function fetchHistoryPreferTail(
   client: SFNClient,
   executionArn: string,
-  hardCap = 5000,
-): Promise<HistoryEvent[]> {
+  hardCap = HISTORY_HARD_CAP,
+): Promise<{ events: HistoryEvent[]; truncated: boolean }> {
+  const newest = await fetchHistoryPages(client, executionArn, {
+    reverseOrder: true,
+    hardCap,
+  });
+
+  // reverseOrder pages are newest-first; restore chronological order
+  const tailChronological = [...newest.events].reverse();
+
+  if (!newest.truncated) {
+    return { events: tailChronological, truncated: false };
+  }
+
+  // Truncated: merge head (ExecutionStarted + early path) with capped tail
+  const headCap = Math.min(1000, hardCap);
+  const oldest = await fetchHistoryPages(client, executionArn, {
+    reverseOrder: false,
+    hardCap: headCap,
+  });
+
+  const byId = new Map<number, HistoryEvent>();
+  for (const e of oldest.events) {
+    if (e.id != null) byId.set(e.id, e);
+  }
+  for (const e of tailChronological) {
+    if (e.id != null) byId.set(e.id, e);
+  }
+
+  const merged = [...byId.values()].sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+  return { events: merged, truncated: true };
+}
+
+async function fetchHistoryPages(
+  client: SFNClient,
+  executionArn: string,
+  opts: { reverseOrder: boolean; hardCap: number },
+): Promise<{ events: HistoryEvent[]; truncated: boolean }> {
   const events: HistoryEvent[] = [];
   let nextToken: string | undefined;
+  let truncated = false;
   do {
     const page = await client.send(
       new GetExecutionHistoryCommand({
@@ -231,14 +301,21 @@ async function fetchAllHistory(
         includeExecutionData: true,
         maxResults: 1000,
         nextToken,
-        reverseOrder: false,
+        reverseOrder: opts.reverseOrder,
       }),
     );
     events.push(...(page.events ?? []));
     nextToken = page.nextToken;
-    if (events.length >= hardCap) break;
+    if (events.length >= opts.hardCap) {
+      if (nextToken) truncated = true;
+      break;
+    }
   } while (nextToken);
-  return events;
+  if (events.length > opts.hardCap) {
+    events.length = opts.hardCap;
+    truncated = true;
+  }
+  return { events, truncated };
 }
 
 function toCoreEvent(e: HistoryEvent): CoreHistoryEvent {
@@ -248,7 +325,6 @@ function toCoreEvent(e: HistoryEvent): CoreHistoryEvent {
     timestamp: e.timestamp ?? new Date(),
     previousEventId: e.previousEventId,
   };
-  // Copy detail blobs
   for (const [k, v] of Object.entries(e)) {
     if (k.endsWith("EventDetails") || k.endsWith("FailedEventDetails")) {
       base[k] = v;
@@ -261,7 +337,13 @@ function toCoreEvent(e: HistoryEvent): CoreHistoryEvent {
 export function extractStateIo(
   history: CoreHistoryEvent[],
   stateName: string,
-): { input?: unknown; output?: unknown; error?: string; cause?: string; retries: Array<{ error?: string; cause?: string; at?: string }> } {
+): {
+  input?: unknown;
+  output?: unknown;
+  error?: string;
+  cause?: string;
+  retries: Array<{ error?: string; cause?: string; at?: string }>;
+} {
   let input: unknown;
   let output: unknown;
   let error: string | undefined;
@@ -300,7 +382,11 @@ export function extractStateIo(
   return { input, output, error, cause, retries };
 }
 
-function isNearState(history: CoreHistoryEvent[], event: CoreHistoryEvent, stateName: string): boolean {
+function isNearState(
+  history: CoreHistoryEvent[],
+  event: CoreHistoryEvent,
+  stateName: string,
+): boolean {
   const idx = history.indexOf(event);
   for (let i = idx; i >= 0 && i >= idx - 10; i--) {
     const e = history[i]!;

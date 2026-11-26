@@ -60,6 +60,7 @@ export interface ExecutionSummary {
     durationMs?: number;
     error?: string;
   }>;
+  historyTruncated?: boolean;
 }
 
 export interface Capabilities {
@@ -96,6 +97,7 @@ export interface ShowExecutionPayload {
   redriveCount?: number;
   redriveDate?: string;
   redriveStatus?: string;
+  historyTruncated?: boolean;
 }
 
 export interface ExecutionListItem {

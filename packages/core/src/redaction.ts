@@ -1,5 +1,8 @@
 const DEFAULT_KEY_PATTERN =
-  /^(password|passwd|secret|ssn|email|phone|address|creditcard|credit_card|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key)$/i;
+  /^(password|passwd|secret|ssn|phone|address|creditcard|credit_card|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key)$/i;
+
+/** Matches email, claimantEmail, customer_email, etc. */
+const EMAIL_KEY_PATTERN = /email/i;
 
 export interface RedactionOptions {
   /** Extra JSONPath-like paths, e.g. "$.customer.ssn" or "customer.ssn". */
@@ -18,6 +21,41 @@ export function redactValue(value: unknown, options: RedactionOptions = {}): unk
     ...(options.extraKeys ?? []).map((k) => `$..${k}`),
   ]);
   return walk(value, "$", paths, new Set(options.extraKeys?.map((k) => k.toLowerCase()) ?? []));
+}
+
+/**
+ * Redact an error/cause string that may be JSON (Lambda payload) or plain text.
+ * Always returns a string suitable for model/UI display.
+ */
+export function redactJsonString(raw: string | undefined, options?: RedactionOptions): unknown {
+  if (raw == null || raw === "") return undefined;
+  try {
+    return redactValue(JSON.parse(raw), options);
+  } catch {
+    return raw;
+  }
+}
+
+export function redactErrorCause(
+  value: unknown,
+  options: RedactionOptions = {},
+): string | undefined {
+  if (value == null || value === "") return undefined;
+  if (typeof value === "object") {
+    return JSON.stringify(redactValue(value, options));
+  }
+  const s = String(value);
+  try {
+    return JSON.stringify(redactValue(JSON.parse(s), options));
+  } catch {
+    return scrubPlainText(s);
+  }
+}
+
+function scrubPlainText(s: string): string {
+  return s
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED]")
+    .replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[REDACTED]");
 }
 
 function parseEnvPaths(raw: string | undefined): string[] {
@@ -60,33 +98,47 @@ function shouldRedactKey(
   paths: string[],
   extraKeys: Set<string>,
 ): boolean {
-  if (DEFAULT_KEY_PATTERN.test(key) || extraKeys.has(key.toLowerCase())) return true;
+  if (DEFAULT_KEY_PATTERN.test(key) || EMAIL_KEY_PATTERN.test(key)) return true;
+  if (extraKeys.has(key.toLowerCase())) return true;
   for (const p of paths) {
     if (pathMatches(p, fullPath, key)) return true;
   }
   return false;
 }
 
-/** Very small matcher: exact path, or `$..key`, or `$.a.b`. */
+/** Exact path, `$..key`, or wildcard array path like `$.items[*].ssn`. */
 function pathMatches(pattern: string, fullPath: string, key: string): boolean {
   if (pattern === fullPath) return true;
   if (pattern.startsWith("$..") && pattern.slice(3).toLowerCase() === key.toLowerCase()) {
     return true;
   }
-  // Wildcard array: $.items[*].ssn
-  const wild = pattern.replace(/\[\*\]/g, "\\[\\d+\\]").replace(/\./g, "\\.");
   try {
-    return new RegExp(`^${wild}$`, "i").test(fullPath);
+    return pathPatternToRegExp(pattern).test(fullPath);
   } catch {
     return false;
   }
 }
 
-export function redactJsonString(raw: string | undefined, options?: RedactionOptions): unknown {
-  if (raw == null || raw === "") return undefined;
-  try {
-    return redactValue(JSON.parse(raw), options);
-  } catch {
-    return raw;
+/**
+ * Convert a simple JSONPath pattern to a RegExp.
+ * Escapes `$` and other regex metacharacters; maps `[*]` → `\[\d+\]`.
+ */
+export function pathPatternToRegExp(pattern: string): RegExp {
+  let out = "^";
+  for (let i = 0; i < pattern.length; ) {
+    if (pattern.startsWith("[*]", i)) {
+      out += "\\[\\d+\\]";
+      i += 3;
+      continue;
+    }
+    const ch = pattern[i]!;
+    if (/[.+?^${}()|[\]\\]/.test(ch)) {
+      out += `\\${ch}`;
+    } else {
+      out += ch;
+    }
+    i += 1;
   }
+  out += "$";
+  return new RegExp(out, "i");
 }

@@ -1,0 +1,3115 @@
+{
+  "id": "f4-map-large",
+  "description": "Large Map run (80 items); failure on the last item — stresses history tail",
+  "faultId": "F4-LARGE",
+  "execution": {
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f4-map-large",
+    "name": "f4-map-large",
+    "status": "FAILED",
+    "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
+    "startDate": "2026-11-26T12:00:00.000Z",
+    "stopDate": "2026-11-26T12:00:04.010Z",
+    "error": "States.TaskFailed",
+    "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"map item failed: {\\\"id\\\":79,\\\"fail\\\":true,\\\"email\\\":\\\"item79@example.com\\\"}\",\"claimantEmail\":\"item79@example.com\"}"
+  },
+  "definition": {
+    "Comment": "sfn-lens demo — cheap fault-injection workflow",
+    "StartAt": "Validate",
+    "States": {
+      "Validate": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": {
+          "step": "validate",
+          "fault.$": "$.fault"
+        },
+        "Next": "Route"
+      },
+      "Route": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "reject",
+            "Next": "Reject"
+          }
+        ],
+        "Default": "MaybeMap"
+      },
+      "MaybeMap": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "map_partial",
+            "Next": "ProcessMap"
+          }
+        ],
+        "Default": "Process"
+      },
+      "ProcessMap": {
+        "Type": "Map",
+        "ItemsPath": "$.items",
+        "MaxConcurrency": 2,
+        "Iterator": {
+          "StartAt": "MapItem",
+          "States": {
+            "MapItem": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+              "Parameters": {
+                "step": "map_item",
+                "item.$": "$"
+              },
+              "End": true
+            }
+          }
+        },
+        "Next": "Done"
+      },
+      "Process": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": {
+          "step": "process",
+          "fault.$": "$.fault"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 2,
+            "BackoffRate": 1.5
+          }
+        ],
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "HandleError",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Next": "Done"
+      },
+      "HandleError": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "caught_then_fail",
+            "Next": "FailAfterCatch"
+          }
+        ],
+        "Default": "Done"
+      },
+      "FailAfterCatch": {
+        "Type": "Fail",
+        "Error": "CaughtThenFailed",
+        "Cause": "recovered from task error then failed deliberately"
+      },
+      "Reject": {
+        "Type": "Fail",
+        "Error": "Rejected",
+        "Cause": "validation rejected"
+      },
+      "Done": {
+        "Type": "Succeed"
+      }
+    }
+  },
+  "history": [
+    {
+      "id": 1,
+      "type": "ExecutionStarted",
+      "timestamp": "2026-11-26T12:00:00.000Z",
+      "executionStartedEventDetails": {
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":0},{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},{\"id\":11},{\"id\":12},{\"id\":13},{\"id\":14},{\"id\":15},{\"id\":16},{\"id\":17},{\"id\":18},{\"id\":19},{\"id\":20},{\"id\":21},{\"id\":22},{\"id\":23},{\"id\":24},{\"id\":25},{\"id\":26},{\"id\":27},{\"id\":28},{\"id\":29},{\"id\":30},{\"id\":31},{\"id\":32},{\"id\":33},{\"id\":34},{\"id\":35},{\"id\":36},{\"id\":37},{\"id\":38},{\"id\":39},{\"id\":40},{\"id\":41},{\"id\":42},{\"id\":43},{\"id\":44},{\"id\":45},{\"id\":46},{\"id\":47},{\"id\":48},{\"id\":49},{\"id\":50},{\"id\":51},{\"id\":52},{\"id\":53},{\"id\":54},{\"id\":55},{\"id\":56},{\"id\":57},{\"id\":58},{\"id\":59},{\"id\":60},{\"id\":61},{\"id\":62},{\"id\":63},{\"id\":64},{\"id\":65},{\"id\":66},{\"id\":67},{\"id\":68},{\"id\":69},{\"id\":70},{\"id\":71},{\"id\":72},{\"id\":73},{\"id\":74},{\"id\":75},{\"id\":76},{\"id\":77},{\"id\":78},{\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}]}"
+      }
+    },
+    {
+      "id": 2,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.100Z",
+      "stateEnteredEventDetails": {
+        "name": "Validate",
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":0},{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},{\"id\":11},{\"id\":12},{\"id\":13},{\"id\":14},{\"id\":15},{\"id\":16},{\"id\":17},{\"id\":18},{\"id\":19},{\"id\":20},{\"id\":21},{\"id\":22},{\"id\":23},{\"id\":24},{\"id\":25},{\"id\":26},{\"id\":27},{\"id\":28},{\"id\":29},{\"id\":30},{\"id\":31},{\"id\":32},{\"id\":33},{\"id\":34},{\"id\":35},{\"id\":36},{\"id\":37},{\"id\":38},{\"id\":39},{\"id\":40},{\"id\":41},{\"id\":42},{\"id\":43},{\"id\":44},{\"id\":45},{\"id\":46},{\"id\":47},{\"id\":48},{\"id\":49},{\"id\":50},{\"id\":51},{\"id\":52},{\"id\":53},{\"id\":54},{\"id\":55},{\"id\":56},{\"id\":57},{\"id\":58},{\"id\":59},{\"id\":60},{\"id\":61},{\"id\":62},{\"id\":63},{\"id\":64},{\"id\":65},{\"id\":66},{\"id\":67},{\"id\":68},{\"id\":69},{\"id\":70},{\"id\":71},{\"id\":72},{\"id\":73},{\"id\":74},{\"id\":75},{\"id\":76},{\"id\":77},{\"id\":78},{\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}]}"
+      }
+    },
+    {
+      "id": 3,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.400Z",
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"map_partial\",\"items\":[{\"id\":0},{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},{\"id\":11},{\"id\":12},{\"id\":13},{\"id\":14},{\"id\":15},{\"id\":16},{\"id\":17},{\"id\":18},{\"id\":19},{\"id\":20},{\"id\":21},{\"id\":22},{\"id\":23},{\"id\":24},{\"id\":25},{\"id\":26},{\"id\":27},{\"id\":28},{\"id\":29},{\"id\":30},{\"id\":31},{\"id\":32},{\"id\":33},{\"id\":34},{\"id\":35},{\"id\":36},{\"id\":37},{\"id\":38},{\"id\":39},{\"id\":40},{\"id\":41},{\"id\":42},{\"id\":43},{\"id\":44},{\"id\":45},{\"id\":46},{\"id\":47},{\"id\":48},{\"id\":49},{\"id\":50},{\"id\":51},{\"id\":52},{\"id\":53},{\"id\":54},{\"id\":55},{\"id\":56},{\"id\":57},{\"id\":58},{\"id\":59},{\"id\":60},{\"id\":61},{\"id\":62},{\"id\":63},{\"id\":64},{\"id\":65},{\"id\":66},{\"id\":67},{\"id\":68},{\"id\":69},{\"id\":70},{\"id\":71},{\"id\":72},{\"id\":73},{\"id\":74},{\"id\":75},{\"id\":76},{\"id\":77},{\"id\":78},{\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T12:00:00.450Z",
+      "stateEnteredEventDetails": {
+        "name": "Route",
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":0},{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},{\"id\":11},{\"id\":12},{\"id\":13},{\"id\":14},{\"id\":15},{\"id\":16},{\"id\":17},{\"id\":18},{\"id\":19},{\"id\":20},{\"id\":21},{\"id\":22},{\"id\":23},{\"id\":24},{\"id\":25},{\"id\":26},{\"id\":27},{\"id\":28},{\"id\":29},{\"id\":30},{\"id\":31},{\"id\":32},{\"id\":33},{\"id\":34},{\"id\":35},{\"id\":36},{\"id\":37},{\"id\":38},{\"id\":39},{\"id\":40},{\"id\":41},{\"id\":42},{\"id\":43},{\"id\":44},{\"id\":45},{\"id\":46},{\"id\":47},{\"id\":48},{\"id\":49},{\"id\":50},{\"id\":51},{\"id\":52},{\"id\":53},{\"id\":54},{\"id\":55},{\"id\":56},{\"id\":57},{\"id\":58},{\"id\":59},{\"id\":60},{\"id\":61},{\"id\":62},{\"id\":63},{\"id\":64},{\"id\":65},{\"id\":66},{\"id\":67},{\"id\":68},{\"id\":69},{\"id\":70},{\"id\":71},{\"id\":72},{\"id\":73},{\"id\":74},{\"id\":75},{\"id\":76},{\"id\":77},{\"id\":78},{\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 5,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T12:00:00.500Z",
+      "stateExitedEventDetails": {
+        "name": "Route",
+        "output": "{\"fault\":\"map_partial\",\"items\":[{\"id\":0},{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},{\"id\":11},{\"id\":12},{\"id\":13},{\"id\":14},{\"id\":15},{\"id\":16},{\"id\":17},{\"id\":18},{\"id\":19},{\"id\":20},{\"id\":21},{\"id\":22},{\"id\":23},{\"id\":24},{\"id\":25},{\"id\":26},{\"id\":27},{\"id\":28},{\"id\":29},{\"id\":30},{\"id\":31},{\"id\":32},{\"id\":33},{\"id\":34},{\"id\":35},{\"id\":36},{\"id\":37},{\"id\":38},{\"id\":39},{\"id\":40},{\"id\":41},{\"id\":42},{\"id\":43},{\"id\":44},{\"id\":45},{\"id\":46},{\"id\":47},{\"id\":48},{\"id\":49},{\"id\":50},{\"id\":51},{\"id\":52},{\"id\":53},{\"id\":54},{\"id\":55},{\"id\":56},{\"id\":57},{\"id\":58},{\"id\":59},{\"id\":60},{\"id\":61},{\"id\":62},{\"id\":63},{\"id\":64},{\"id\":65},{\"id\":66},{\"id\":67},{\"id\":68},{\"id\":69},{\"id\":70},{\"id\":71},{\"id\":72},{\"id\":73},{\"id\":74},{\"id\":75},{\"id\":76},{\"id\":77},{\"id\":78},{\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 6,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T12:00:00.550Z",
+      "stateEnteredEventDetails": {
+        "name": "MaybeMap",
+        "input": "{\"fault\":\"map_partial\",\"items\":[{\"id\":0},{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},{\"id\":11},{\"id\":12},{\"id\":13},{\"id\":14},{\"id\":15},{\"id\":16},{\"id\":17},{\"id\":18},{\"id\":19},{\"id\":20},{\"id\":21},{\"id\":22},{\"id\":23},{\"id\":24},{\"id\":25},{\"id\":26},{\"id\":27},{\"id\":28},{\"id\":29},{\"id\":30},{\"id\":31},{\"id\":32},{\"id\":33},{\"id\":34},{\"id\":35},{\"id\":36},{\"id\":37},{\"id\":38},{\"id\":39},{\"id\":40},{\"id\":41},{\"id\":42},{\"id\":43},{\"id\":44},{\"id\":45},{\"id\":46},{\"id\":47},{\"id\":48},{\"id\":49},{\"id\":50},{\"id\":51},{\"id\":52},{\"id\":53},{\"id\":54},{\"id\":55},{\"id\":56},{\"id\":57},{\"id\":58},{\"id\":59},{\"id\":60},{\"id\":61},{\"id\":62},{\"id\":63},{\"id\":64},{\"id\":65},{\"id\":66},{\"id\":67},{\"id\":68},{\"id\":69},{\"id\":70},{\"id\":71},{\"id\":72},{\"id\":73},{\"id\":74},{\"id\":75},{\"id\":76},{\"id\":77},{\"id\":78},{\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 7,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T12:00:00.600Z",
+      "stateExitedEventDetails": {
+        "name": "MaybeMap",
+        "output": "{\"fault\":\"map_partial\",\"items\":[{\"id\":0},{\"id\":1},{\"id\":2},{\"id\":3},{\"id\":4},{\"id\":5},{\"id\":6},{\"id\":7},{\"id\":8},{\"id\":9},{\"id\":10},{\"id\":11},{\"id\":12},{\"id\":13},{\"id\":14},{\"id\":15},{\"id\":16},{\"id\":17},{\"id\":18},{\"id\":19},{\"id\":20},{\"id\":21},{\"id\":22},{\"id\":23},{\"id\":24},{\"id\":25},{\"id\":26},{\"id\":27},{\"id\":28},{\"id\":29},{\"id\":30},{\"id\":31},{\"id\":32},{\"id\":33},{\"id\":34},{\"id\":35},{\"id\":36},{\"id\":37},{\"id\":38},{\"id\":39},{\"id\":40},{\"id\":41},{\"id\":42},{\"id\":43},{\"id\":44},{\"id\":45},{\"id\":46},{\"id\":47},{\"id\":48},{\"id\":49},{\"id\":50},{\"id\":51},{\"id\":52},{\"id\":53},{\"id\":54},{\"id\":55},{\"id\":56},{\"id\":57},{\"id\":58},{\"id\":59},{\"id\":60},{\"id\":61},{\"id\":62},{\"id\":63},{\"id\":64},{\"id\":65},{\"id\":66},{\"id\":67},{\"id\":68},{\"id\":69},{\"id\":70},{\"id\":71},{\"id\":72},{\"id\":73},{\"id\":74},{\"id\":75},{\"id\":76},{\"id\":77},{\"id\":78},{\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}],\"ok\":true}"
+      }
+    },
+    {
+      "id": 8,
+      "type": "MapStateEntered",
+      "timestamp": "2026-11-26T12:00:00.650Z",
+      "stateEnteredEventDetails": {
+        "name": "ProcessMap",
+        "input": "{\"fault\":\"map_partial\",\"items\":\"[80 items]\"}"
+      }
+    },
+    {
+      "id": 9,
+      "type": "MapStateStarted",
+      "timestamp": "2026-11-26T12:00:00.700Z",
+      "mapStateStartedEventDetails": {
+        "length": 80
+      }
+    },
+    {
+      "id": 10,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:00.800Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 0
+      }
+    },
+    {
+      "id": 11,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.805Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":0}"
+      }
+    },
+    {
+      "id": 12,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.820Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":0}}"
+      }
+    },
+    {
+      "id": 13,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:00.830Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 0
+      }
+    },
+    {
+      "id": 14,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:00.840Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 1
+      }
+    },
+    {
+      "id": 15,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.845Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":1}"
+      }
+    },
+    {
+      "id": 16,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.860Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":1}}"
+      }
+    },
+    {
+      "id": 17,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:00.870Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 1
+      }
+    },
+    {
+      "id": 18,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:00.880Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 2
+      }
+    },
+    {
+      "id": 19,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.885Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":2}"
+      }
+    },
+    {
+      "id": 20,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.900Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":2}}"
+      }
+    },
+    {
+      "id": 21,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:00.910Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 2
+      }
+    },
+    {
+      "id": 22,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:00.920Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 3
+      }
+    },
+    {
+      "id": 23,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.925Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":3}"
+      }
+    },
+    {
+      "id": 24,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.940Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":3}}"
+      }
+    },
+    {
+      "id": 25,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:00.950Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 3
+      }
+    },
+    {
+      "id": 26,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:00.960Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 4
+      }
+    },
+    {
+      "id": 27,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:00.965Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":4}"
+      }
+    },
+    {
+      "id": 28,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:00.980Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":4}}"
+      }
+    },
+    {
+      "id": 29,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:00.990Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 4
+      }
+    },
+    {
+      "id": 30,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.000Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 5
+      }
+    },
+    {
+      "id": 31,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.005Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":5}"
+      }
+    },
+    {
+      "id": 32,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.020Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":5}}"
+      }
+    },
+    {
+      "id": 33,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.030Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 5
+      }
+    },
+    {
+      "id": 34,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.040Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 6
+      }
+    },
+    {
+      "id": 35,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.045Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":6}"
+      }
+    },
+    {
+      "id": 36,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.060Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":6}}"
+      }
+    },
+    {
+      "id": 37,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.070Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 6
+      }
+    },
+    {
+      "id": 38,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.080Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 7
+      }
+    },
+    {
+      "id": 39,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.085Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":7}"
+      }
+    },
+    {
+      "id": 40,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.100Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":7}}"
+      }
+    },
+    {
+      "id": 41,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.110Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 7
+      }
+    },
+    {
+      "id": 42,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.120Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 8
+      }
+    },
+    {
+      "id": 43,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.125Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":8}"
+      }
+    },
+    {
+      "id": 44,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.140Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":8}}"
+      }
+    },
+    {
+      "id": 45,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.150Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 8
+      }
+    },
+    {
+      "id": 46,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.160Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 9
+      }
+    },
+    {
+      "id": 47,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.165Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":9}"
+      }
+    },
+    {
+      "id": 48,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.180Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":9}}"
+      }
+    },
+    {
+      "id": 49,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.190Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 9
+      }
+    },
+    {
+      "id": 50,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.200Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 10
+      }
+    },
+    {
+      "id": 51,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.205Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":10}"
+      }
+    },
+    {
+      "id": 52,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.220Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":10}}"
+      }
+    },
+    {
+      "id": 53,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.230Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 10
+      }
+    },
+    {
+      "id": 54,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.240Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 11
+      }
+    },
+    {
+      "id": 55,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.245Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":11}"
+      }
+    },
+    {
+      "id": 56,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.260Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":11}}"
+      }
+    },
+    {
+      "id": 57,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.270Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 11
+      }
+    },
+    {
+      "id": 58,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.280Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 12
+      }
+    },
+    {
+      "id": 59,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.285Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":12}"
+      }
+    },
+    {
+      "id": 60,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.300Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":12}}"
+      }
+    },
+    {
+      "id": 61,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.310Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 12
+      }
+    },
+    {
+      "id": 62,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.320Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 13
+      }
+    },
+    {
+      "id": 63,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.325Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":13}"
+      }
+    },
+    {
+      "id": 64,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.340Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":13}}"
+      }
+    },
+    {
+      "id": 65,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.350Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 13
+      }
+    },
+    {
+      "id": 66,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.360Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 14
+      }
+    },
+    {
+      "id": 67,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.365Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":14}"
+      }
+    },
+    {
+      "id": 68,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.380Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":14}}"
+      }
+    },
+    {
+      "id": 69,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.390Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 14
+      }
+    },
+    {
+      "id": 70,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.400Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 15
+      }
+    },
+    {
+      "id": 71,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.405Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":15}"
+      }
+    },
+    {
+      "id": 72,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.420Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":15}}"
+      }
+    },
+    {
+      "id": 73,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.430Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 15
+      }
+    },
+    {
+      "id": 74,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.440Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 16
+      }
+    },
+    {
+      "id": 75,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.445Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":16}"
+      }
+    },
+    {
+      "id": 76,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.460Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":16}}"
+      }
+    },
+    {
+      "id": 77,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.470Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 16
+      }
+    },
+    {
+      "id": 78,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.480Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 17
+      }
+    },
+    {
+      "id": 79,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.485Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":17}"
+      }
+    },
+    {
+      "id": 80,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.500Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":17}}"
+      }
+    },
+    {
+      "id": 81,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.510Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 17
+      }
+    },
+    {
+      "id": 82,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.520Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 18
+      }
+    },
+    {
+      "id": 83,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.525Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":18}"
+      }
+    },
+    {
+      "id": 84,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.540Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":18}}"
+      }
+    },
+    {
+      "id": 85,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.550Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 18
+      }
+    },
+    {
+      "id": 86,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.560Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 19
+      }
+    },
+    {
+      "id": 87,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.565Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":19}"
+      }
+    },
+    {
+      "id": 88,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.580Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":19}}"
+      }
+    },
+    {
+      "id": 89,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.590Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 19
+      }
+    },
+    {
+      "id": 90,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.600Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 20
+      }
+    },
+    {
+      "id": 91,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.605Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":20}"
+      }
+    },
+    {
+      "id": 92,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.620Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":20}}"
+      }
+    },
+    {
+      "id": 93,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.630Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 20
+      }
+    },
+    {
+      "id": 94,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.640Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 21
+      }
+    },
+    {
+      "id": 95,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.645Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":21}"
+      }
+    },
+    {
+      "id": 96,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.660Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":21}}"
+      }
+    },
+    {
+      "id": 97,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.670Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 21
+      }
+    },
+    {
+      "id": 98,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.680Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 22
+      }
+    },
+    {
+      "id": 99,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.685Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":22}"
+      }
+    },
+    {
+      "id": 100,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.700Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":22}}"
+      }
+    },
+    {
+      "id": 101,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.710Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 22
+      }
+    },
+    {
+      "id": 102,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.720Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 23
+      }
+    },
+    {
+      "id": 103,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.725Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":23}"
+      }
+    },
+    {
+      "id": 104,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.740Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":23}}"
+      }
+    },
+    {
+      "id": 105,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.750Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 23
+      }
+    },
+    {
+      "id": 106,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.760Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 24
+      }
+    },
+    {
+      "id": 107,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.765Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":24}"
+      }
+    },
+    {
+      "id": 108,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.780Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":24}}"
+      }
+    },
+    {
+      "id": 109,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.790Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 24
+      }
+    },
+    {
+      "id": 110,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.800Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 25
+      }
+    },
+    {
+      "id": 111,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.805Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":25}"
+      }
+    },
+    {
+      "id": 112,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.820Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":25}}"
+      }
+    },
+    {
+      "id": 113,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.830Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 25
+      }
+    },
+    {
+      "id": 114,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.840Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 26
+      }
+    },
+    {
+      "id": 115,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.845Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":26}"
+      }
+    },
+    {
+      "id": 116,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.860Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":26}}"
+      }
+    },
+    {
+      "id": 117,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.870Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 26
+      }
+    },
+    {
+      "id": 118,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.880Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 27
+      }
+    },
+    {
+      "id": 119,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.885Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":27}"
+      }
+    },
+    {
+      "id": 120,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.900Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":27}}"
+      }
+    },
+    {
+      "id": 121,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.910Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 27
+      }
+    },
+    {
+      "id": 122,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.920Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 28
+      }
+    },
+    {
+      "id": 123,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.925Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":28}"
+      }
+    },
+    {
+      "id": 124,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.940Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":28}}"
+      }
+    },
+    {
+      "id": 125,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.950Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 28
+      }
+    },
+    {
+      "id": 126,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:01.960Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 29
+      }
+    },
+    {
+      "id": 127,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:01.965Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":29}"
+      }
+    },
+    {
+      "id": 128,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:01.980Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":29}}"
+      }
+    },
+    {
+      "id": 129,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:01.990Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 29
+      }
+    },
+    {
+      "id": 130,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.000Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 30
+      }
+    },
+    {
+      "id": 131,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.005Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":30}"
+      }
+    },
+    {
+      "id": 132,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.020Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":30}}"
+      }
+    },
+    {
+      "id": 133,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.030Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 30
+      }
+    },
+    {
+      "id": 134,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.040Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 31
+      }
+    },
+    {
+      "id": 135,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.045Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":31}"
+      }
+    },
+    {
+      "id": 136,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.060Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":31}}"
+      }
+    },
+    {
+      "id": 137,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.070Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 31
+      }
+    },
+    {
+      "id": 138,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.080Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 32
+      }
+    },
+    {
+      "id": 139,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.085Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":32}"
+      }
+    },
+    {
+      "id": 140,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.100Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":32}}"
+      }
+    },
+    {
+      "id": 141,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.110Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 32
+      }
+    },
+    {
+      "id": 142,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.120Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 33
+      }
+    },
+    {
+      "id": 143,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.125Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":33}"
+      }
+    },
+    {
+      "id": 144,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.140Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":33}}"
+      }
+    },
+    {
+      "id": 145,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.150Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 33
+      }
+    },
+    {
+      "id": 146,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.160Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 34
+      }
+    },
+    {
+      "id": 147,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.165Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":34}"
+      }
+    },
+    {
+      "id": 148,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.180Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":34}}"
+      }
+    },
+    {
+      "id": 149,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.190Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 34
+      }
+    },
+    {
+      "id": 150,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.200Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 35
+      }
+    },
+    {
+      "id": 151,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.205Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":35}"
+      }
+    },
+    {
+      "id": 152,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.220Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":35}}"
+      }
+    },
+    {
+      "id": 153,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.230Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 35
+      }
+    },
+    {
+      "id": 154,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.240Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 36
+      }
+    },
+    {
+      "id": 155,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.245Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":36}"
+      }
+    },
+    {
+      "id": 156,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.260Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":36}}"
+      }
+    },
+    {
+      "id": 157,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.270Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 36
+      }
+    },
+    {
+      "id": 158,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.280Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 37
+      }
+    },
+    {
+      "id": 159,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.285Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":37}"
+      }
+    },
+    {
+      "id": 160,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.300Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":37}}"
+      }
+    },
+    {
+      "id": 161,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.310Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 37
+      }
+    },
+    {
+      "id": 162,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.320Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 38
+      }
+    },
+    {
+      "id": 163,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.325Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":38}"
+      }
+    },
+    {
+      "id": 164,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.340Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":38}}"
+      }
+    },
+    {
+      "id": 165,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.350Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 38
+      }
+    },
+    {
+      "id": 166,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.360Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 39
+      }
+    },
+    {
+      "id": 167,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.365Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":39}"
+      }
+    },
+    {
+      "id": 168,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.380Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":39}}"
+      }
+    },
+    {
+      "id": 169,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.390Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 39
+      }
+    },
+    {
+      "id": 170,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.400Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 40
+      }
+    },
+    {
+      "id": 171,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.405Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":40}"
+      }
+    },
+    {
+      "id": 172,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.420Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":40}}"
+      }
+    },
+    {
+      "id": 173,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.430Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 40
+      }
+    },
+    {
+      "id": 174,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.440Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 41
+      }
+    },
+    {
+      "id": 175,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.445Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":41}"
+      }
+    },
+    {
+      "id": 176,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.460Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":41}}"
+      }
+    },
+    {
+      "id": 177,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.470Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 41
+      }
+    },
+    {
+      "id": 178,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.480Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 42
+      }
+    },
+    {
+      "id": 179,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.485Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":42}"
+      }
+    },
+    {
+      "id": 180,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.500Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":42}}"
+      }
+    },
+    {
+      "id": 181,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.510Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 42
+      }
+    },
+    {
+      "id": 182,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.520Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 43
+      }
+    },
+    {
+      "id": 183,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.525Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":43}"
+      }
+    },
+    {
+      "id": 184,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.540Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":43}}"
+      }
+    },
+    {
+      "id": 185,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.550Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 43
+      }
+    },
+    {
+      "id": 186,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.560Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 44
+      }
+    },
+    {
+      "id": 187,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.565Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":44}"
+      }
+    },
+    {
+      "id": 188,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.580Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":44}}"
+      }
+    },
+    {
+      "id": 189,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.590Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 44
+      }
+    },
+    {
+      "id": 190,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.600Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 45
+      }
+    },
+    {
+      "id": 191,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.605Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":45}"
+      }
+    },
+    {
+      "id": 192,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.620Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":45}}"
+      }
+    },
+    {
+      "id": 193,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.630Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 45
+      }
+    },
+    {
+      "id": 194,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.640Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 46
+      }
+    },
+    {
+      "id": 195,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.645Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":46}"
+      }
+    },
+    {
+      "id": 196,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.660Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":46}}"
+      }
+    },
+    {
+      "id": 197,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.670Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 46
+      }
+    },
+    {
+      "id": 198,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.680Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 47
+      }
+    },
+    {
+      "id": 199,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.685Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":47}"
+      }
+    },
+    {
+      "id": 200,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.700Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":47}}"
+      }
+    },
+    {
+      "id": 201,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.710Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 47
+      }
+    },
+    {
+      "id": 202,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.720Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 48
+      }
+    },
+    {
+      "id": 203,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.725Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":48}"
+      }
+    },
+    {
+      "id": 204,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.740Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":48}}"
+      }
+    },
+    {
+      "id": 205,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.750Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 48
+      }
+    },
+    {
+      "id": 206,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.760Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 49
+      }
+    },
+    {
+      "id": 207,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.765Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":49}"
+      }
+    },
+    {
+      "id": 208,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.780Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":49}}"
+      }
+    },
+    {
+      "id": 209,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.790Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 49
+      }
+    },
+    {
+      "id": 210,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.800Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 50
+      }
+    },
+    {
+      "id": 211,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.805Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":50}"
+      }
+    },
+    {
+      "id": 212,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.820Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":50}}"
+      }
+    },
+    {
+      "id": 213,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.830Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 50
+      }
+    },
+    {
+      "id": 214,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.840Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 51
+      }
+    },
+    {
+      "id": 215,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.845Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":51}"
+      }
+    },
+    {
+      "id": 216,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.860Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":51}}"
+      }
+    },
+    {
+      "id": 217,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.870Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 51
+      }
+    },
+    {
+      "id": 218,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.880Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 52
+      }
+    },
+    {
+      "id": 219,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.885Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":52}"
+      }
+    },
+    {
+      "id": 220,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.900Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":52}}"
+      }
+    },
+    {
+      "id": 221,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.910Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 52
+      }
+    },
+    {
+      "id": 222,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.920Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 53
+      }
+    },
+    {
+      "id": 223,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.925Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":53}"
+      }
+    },
+    {
+      "id": 224,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.940Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":53}}"
+      }
+    },
+    {
+      "id": 225,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.950Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 53
+      }
+    },
+    {
+      "id": 226,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:02.960Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 54
+      }
+    },
+    {
+      "id": 227,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:02.965Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":54}"
+      }
+    },
+    {
+      "id": 228,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:02.980Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":54}}"
+      }
+    },
+    {
+      "id": 229,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:02.990Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 54
+      }
+    },
+    {
+      "id": 230,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.000Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 55
+      }
+    },
+    {
+      "id": 231,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.005Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":55}"
+      }
+    },
+    {
+      "id": 232,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.020Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":55}}"
+      }
+    },
+    {
+      "id": 233,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.030Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 55
+      }
+    },
+    {
+      "id": 234,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.040Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 56
+      }
+    },
+    {
+      "id": 235,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.045Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":56}"
+      }
+    },
+    {
+      "id": 236,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.060Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":56}}"
+      }
+    },
+    {
+      "id": 237,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.070Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 56
+      }
+    },
+    {
+      "id": 238,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.080Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 57
+      }
+    },
+    {
+      "id": 239,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.085Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":57}"
+      }
+    },
+    {
+      "id": 240,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.100Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":57}}"
+      }
+    },
+    {
+      "id": 241,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.110Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 57
+      }
+    },
+    {
+      "id": 242,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.120Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 58
+      }
+    },
+    {
+      "id": 243,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.125Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":58}"
+      }
+    },
+    {
+      "id": 244,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.140Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":58}}"
+      }
+    },
+    {
+      "id": 245,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.150Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 58
+      }
+    },
+    {
+      "id": 246,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.160Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 59
+      }
+    },
+    {
+      "id": 247,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.165Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":59}"
+      }
+    },
+    {
+      "id": 248,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.180Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":59}}"
+      }
+    },
+    {
+      "id": 249,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.190Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 59
+      }
+    },
+    {
+      "id": 250,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.200Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 60
+      }
+    },
+    {
+      "id": 251,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.205Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":60}"
+      }
+    },
+    {
+      "id": 252,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.220Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":60}}"
+      }
+    },
+    {
+      "id": 253,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.230Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 60
+      }
+    },
+    {
+      "id": 254,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.240Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 61
+      }
+    },
+    {
+      "id": 255,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.245Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":61}"
+      }
+    },
+    {
+      "id": 256,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.260Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":61}}"
+      }
+    },
+    {
+      "id": 257,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.270Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 61
+      }
+    },
+    {
+      "id": 258,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.280Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 62
+      }
+    },
+    {
+      "id": 259,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.285Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":62}"
+      }
+    },
+    {
+      "id": 260,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.300Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":62}}"
+      }
+    },
+    {
+      "id": 261,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.310Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 62
+      }
+    },
+    {
+      "id": 262,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.320Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 63
+      }
+    },
+    {
+      "id": 263,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.325Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":63}"
+      }
+    },
+    {
+      "id": 264,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.340Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":63}}"
+      }
+    },
+    {
+      "id": 265,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.350Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 63
+      }
+    },
+    {
+      "id": 266,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.360Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 64
+      }
+    },
+    {
+      "id": 267,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.365Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":64}"
+      }
+    },
+    {
+      "id": 268,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.380Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":64}}"
+      }
+    },
+    {
+      "id": 269,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.390Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 64
+      }
+    },
+    {
+      "id": 270,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.400Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 65
+      }
+    },
+    {
+      "id": 271,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.405Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":65}"
+      }
+    },
+    {
+      "id": 272,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.420Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":65}}"
+      }
+    },
+    {
+      "id": 273,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.430Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 65
+      }
+    },
+    {
+      "id": 274,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.440Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 66
+      }
+    },
+    {
+      "id": 275,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.445Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":66}"
+      }
+    },
+    {
+      "id": 276,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.460Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":66}}"
+      }
+    },
+    {
+      "id": 277,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.470Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 66
+      }
+    },
+    {
+      "id": 278,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.480Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 67
+      }
+    },
+    {
+      "id": 279,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.485Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":67}"
+      }
+    },
+    {
+      "id": 280,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.500Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":67}}"
+      }
+    },
+    {
+      "id": 281,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.510Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 67
+      }
+    },
+    {
+      "id": 282,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.520Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 68
+      }
+    },
+    {
+      "id": 283,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.525Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":68}"
+      }
+    },
+    {
+      "id": 284,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.540Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":68}}"
+      }
+    },
+    {
+      "id": 285,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.550Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 68
+      }
+    },
+    {
+      "id": 286,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.560Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 69
+      }
+    },
+    {
+      "id": 287,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.565Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":69}"
+      }
+    },
+    {
+      "id": 288,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.580Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":69}}"
+      }
+    },
+    {
+      "id": 289,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.590Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 69
+      }
+    },
+    {
+      "id": 290,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.600Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 70
+      }
+    },
+    {
+      "id": 291,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.605Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":70}"
+      }
+    },
+    {
+      "id": 292,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.620Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":70}}"
+      }
+    },
+    {
+      "id": 293,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.630Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 70
+      }
+    },
+    {
+      "id": 294,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.640Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 71
+      }
+    },
+    {
+      "id": 295,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.645Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":71}"
+      }
+    },
+    {
+      "id": 296,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.660Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":71}}"
+      }
+    },
+    {
+      "id": 297,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.670Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 71
+      }
+    },
+    {
+      "id": 298,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.680Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 72
+      }
+    },
+    {
+      "id": 299,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.685Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":72}"
+      }
+    },
+    {
+      "id": 300,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.700Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":72}}"
+      }
+    },
+    {
+      "id": 301,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.710Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 72
+      }
+    },
+    {
+      "id": 302,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.720Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 73
+      }
+    },
+    {
+      "id": 303,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.725Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":73}"
+      }
+    },
+    {
+      "id": 304,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.740Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":73}}"
+      }
+    },
+    {
+      "id": 305,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.750Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 73
+      }
+    },
+    {
+      "id": 306,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.760Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 74
+      }
+    },
+    {
+      "id": 307,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.765Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":74}"
+      }
+    },
+    {
+      "id": 308,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.780Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":74}}"
+      }
+    },
+    {
+      "id": 309,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.790Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 74
+      }
+    },
+    {
+      "id": 310,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.800Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 75
+      }
+    },
+    {
+      "id": 311,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.805Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":75}"
+      }
+    },
+    {
+      "id": 312,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.820Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":75}}"
+      }
+    },
+    {
+      "id": 313,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.830Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 75
+      }
+    },
+    {
+      "id": 314,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.840Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 76
+      }
+    },
+    {
+      "id": 315,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.845Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":76}"
+      }
+    },
+    {
+      "id": 316,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.860Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":76}}"
+      }
+    },
+    {
+      "id": 317,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.870Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 76
+      }
+    },
+    {
+      "id": 318,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.880Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 77
+      }
+    },
+    {
+      "id": 319,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.885Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":77}"
+      }
+    },
+    {
+      "id": 320,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.900Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":77}}"
+      }
+    },
+    {
+      "id": 321,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.910Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 77
+      }
+    },
+    {
+      "id": 322,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.920Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 78
+      }
+    },
+    {
+      "id": 323,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.925Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":78}"
+      }
+    },
+    {
+      "id": 324,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T12:00:03.940Z",
+      "stateExitedEventDetails": {
+        "name": "MapItem",
+        "output": "{\"ok\":true,\"item\":{\"id\":78}}"
+      }
+    },
+    {
+      "id": 325,
+      "type": "MapIterationSucceeded",
+      "timestamp": "2026-11-26T12:00:03.950Z",
+      "mapIterationSucceededEventDetails": {
+        "name": "ProcessMap",
+        "index": 78
+      }
+    },
+    {
+      "id": 326,
+      "type": "MapIterationStarted",
+      "timestamp": "2026-11-26T12:00:03.960Z",
+      "mapIterationStartedEventDetails": {
+        "name": "ProcessMap",
+        "index": 79
+      }
+    },
+    {
+      "id": 327,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T12:00:03.965Z",
+      "stateEnteredEventDetails": {
+        "name": "MapItem",
+        "input": "{\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}"
+      }
+    },
+    {
+      "id": 328,
+      "type": "TaskFailed",
+      "timestamp": "2026-11-26T12:00:03.985Z",
+      "taskFailedEventDetails": {
+        "error": "States.TaskFailed",
+        "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"map item failed: {\\\"id\\\":79,\\\"fail\\\":true,\\\"email\\\":\\\"item79@example.com\\\"}\",\"claimantEmail\":\"item79@example.com\"}"
+      }
+    },
+    {
+      "id": 329,
+      "type": "MapIterationFailed",
+      "timestamp": "2026-11-26T12:00:03.990Z",
+      "mapIterationFailedEventDetails": {
+        "name": "ProcessMap",
+        "index": 79
+      }
+    },
+    {
+      "id": 330,
+      "type": "MapStateFailed",
+      "timestamp": "2026-11-26T12:00:04.000Z"
+    },
+    {
+      "id": 331,
+      "type": "ExecutionFailed",
+      "timestamp": "2026-11-26T12:00:04.010Z",
+      "executionFailedEventDetails": {
+        "error": "States.TaskFailed",
+        "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"map item failed: {\\\"id\\\":79,\\\"fail\\\":true,\\\"email\\\":\\\"item79@example.com\\\"}\",\"claimantEmail\":\"item79@example.com\"}"
+      }
+    }
+  ],
+  "stateDetails": {
+    "MapItem": {
+      "input": {
+        "id": 79,
+        "fail": true,
+        "email": "item79@example.com"
+      },
+      "error": "States.TaskFailed",
+      "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"map item failed: {\\\"id\\\":79,\\\"fail\\\":true,\\\"email\\\":\\\"item79@example.com\\\"}\",\"claimantEmail\":\"item79@example.com\"}"
+    }
+  },
+  "gold": {
+    "failedState": "MapItem",
+    "errorClass": "States.TaskFailed",
+    "rootCause": "map item failed"
+  }
+}
