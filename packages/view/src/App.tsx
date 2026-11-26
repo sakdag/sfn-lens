@@ -12,6 +12,7 @@ import {
   ReactFlow,
   type Edge,
   type Node,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -63,6 +64,8 @@ export function App() {
   const [redriveBusy, setRedriveBusy] = useState(false);
   const [redriveError, setRedriveError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [fillHost, setFillHost] = useState(false);
+  const [rf, setRf] = useState<ReactFlowInstance | null>(null);
 
   const { app, error } = useApp({
     appInfo: { name: "sfn-lens", version: "0.1.0" },
@@ -131,6 +134,32 @@ export function App() {
 
   useHostStyles(app, hostContext);
   const theme = useDocumentTheme();
+
+  // Side/fullscreen pane: fill the iframe. Inline chat: keep a compact workspace
+  // so host auto-resize does not leave a giant empty chin.
+  useEffect(() => {
+    const update = () => {
+      const mode = hostContext?.displayMode;
+      const tall = typeof window !== "undefined" && window.innerHeight >= 560;
+      const next = mode === "fullscreen" || mode === "pip" || tall;
+      setFillHost(next);
+      document.documentElement.classList.toggle("fill-host", next);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      document.documentElement.classList.remove("fill-host");
+    };
+  }, [hostContext?.displayMode]);
+
+  useEffect(() => {
+    if (!rf || tab !== "graph") return;
+    const id = requestAnimationFrame(() => {
+      void rf.fitView({ padding: 0.18 });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [rf, fillHost, tab, payload?.executionArn]);
 
   const refreshExecutions = useCallback(
     async (
@@ -410,7 +439,7 @@ export function App() {
     !fixture;
 
   return (
-    <div className="app">
+    <div className={fillHost ? "app fill-host" : "app"}>
       <header className="header">
         <h1>sfn-lens</h1>
         {payload ? (
@@ -493,6 +522,7 @@ export function App() {
                 nodesConnectable={false}
                 elementsSelectable
                 colorMode={theme === "dark" ? "dark" : "light"}
+                onInit={setRf}
                 onNodeClick={(_, node) => {
                   const name = (node.data as StateNodeData).name;
                   void onSelectState(app, name, payload);

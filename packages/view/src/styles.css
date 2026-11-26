@@ -131,11 +131,17 @@ html,
 body,
 #root {
   margin: 0;
-  /* Content-sized so MCP host auto-resize can shrink the iframe (no empty "chin"). */
+  /* Inline chat: content-sized (host auto-resize). Side pane: .fill-host → 100%. */
   height: auto;
   min-height: 0;
   background: var(--bg);
   color: var(--text);
+}
+
+html.fill-host,
+html.fill-host body,
+html.fill-host #root {
+  height: 100%;
 }
 
 .app {
@@ -144,6 +150,11 @@ body,
   width: 100%;
   height: auto;
   min-height: 0;
+}
+
+.app.fill-host {
+  height: 100%;
+  min-height: 100%;
 }
 
 .header {
@@ -244,6 +255,12 @@ body,
   overflow: auto;
   padding: 12px 14px;
   background: var(--canvas);
+}
+
+.app.fill-host .console-panel {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 .filters {
@@ -352,6 +369,17 @@ body,
   gap: 10px;
   min-height: 360px;
   max-height: 640px;
+}
+
+.app.fill-host .definition-panel {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.app.fill-host .definition-pre {
+  flex: 1;
+  min-height: 0;
 }
 
 .definition-meta {
@@ -487,10 +515,17 @@ body,
 .body {
   display: grid;
   grid-template-columns: 1fr minmax(260px, 340px);
-  /* Fixed working area — host iframe shrink-wraps to header+tabs+this */
+  /* Inline: compact fixed workspace. Side pane (.fill-host): grow. */
   height: 440px;
   min-height: 440px;
   max-height: 440px;
+}
+
+.app.fill-host .body {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  max-height: none;
 }
 
 .graph-pane {
@@ -752,6 +787,10 @@ body,
     height: 520px;
     min-height: 520px;
     max-height: 520px;
+  }
+  .app.fill-host .body {
+    height: auto;
+    max-height: none;
   }
   .graph-pane {
     border-right: none;
