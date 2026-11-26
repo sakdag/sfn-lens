@@ -72,21 +72,21 @@ export function App() {
         const data = result.structuredContent as Record<string, unknown> | undefined;
         if (!data) return;
 
+        // list_executions / get_definition are data-only (no UI). Host may still
+        // push their results here when the app called them — update panels only.
         if (data.view === "executions" || (Array.isArray(data.executions) && !data.graph)) {
           const list = data as unknown as ExecutionsPayload;
           setExecutions(list.executions ?? []);
           setExecStateMachineArn(list.stateMachineArn);
-          setStatusFilter(list.filters?.statusFilter ?? "");
-          setNameContains(list.filters?.nameContains ?? "");
-          setTab("executions");
+          if (list.filters?.statusFilter != null) setStatusFilter(list.filters.statusFilter);
+          if (list.filters?.nameContains != null) setNameContains(list.filters.nameContains);
           return;
         }
 
-        if (data.view === "definition" || (typeof data.definitionText === "string" && !data.graph)) {
+        if (data.view === "definition" && typeof data.definitionText === "string" && !data.graph) {
           const def = data as unknown as DefinitionPayload;
           setDefinitionText(def.definitionText);
           setDefinitionMeta(def);
-          setTab("definition");
           return;
         }
 

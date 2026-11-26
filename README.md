@@ -75,9 +75,9 @@ Ask the assistant to `show_execution` with `fixtureId: "f1-lambda-error"`.
 
 | Tool | Visible to | Purpose |
 | --- | --- | --- |
-| `show_execution` | model + app | Open console on one execution (graph) |
-| `list_executions` | model + app | Executions browser (status / name filters) |
-| `get_definition` | model + app | ASL definition tab |
+| `show_execution` | model + app | **Only tool that opens the UI** — console on one execution |
+| `list_executions` | model + app | Data only (status / name filters); console Executions tab also uses this |
+| `get_definition` | model + app | Data only; console Definition tab also uses this |
 | `compare_executions` | model + app | Diff two runs |
 | `list_state_machines` | model | Discover state machine ARNs |
 | `get_state_detail` | app only | Input/output/retries for one state |

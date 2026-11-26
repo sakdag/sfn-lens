@@ -149,7 +149,7 @@ export function createServer(): McpServer {
     {
       title: "Show Step Functions execution",
       description:
-        "Load an AWS Step Functions execution and render the in-chat console (graph, executions list, definition). Prefer this over dumping raw GetExecutionHistory.",
+        "Load an AWS Step Functions execution and open the in-chat console (graph, executions list, definition, redrive). This is the only tool that renders the UI — call it once per execution you want to show. Prefer this over dumping raw GetExecutionHistory.",
       inputSchema: z.object({
         executionArn: z.string().optional().describe("Full execution ARN"),
         stateMachineArn: z.string().optional().describe("State machine ARN (with name)"),
@@ -290,7 +290,7 @@ export function createServer(): McpServer {
     {
       title: "List Step Functions executions",
       description:
-        "List executions for a state machine with optional status and name filters. Opens the in-chat executions browser.",
+        "List executions for a state machine with optional status and name filters. Returns structured data only — do not use this to open the UI. After you pick an execution, call show_execution so the in-chat console opens once.",
       inputSchema: z.object({
         stateMachineArn: z
           .string()
@@ -303,7 +303,6 @@ export function createServer(): McpServer {
       }),
       _meta: {
         ui: {
-          resourceUri: RESOURCE_URI,
           visibility: ["model", "app"],
         },
       },
@@ -376,7 +375,7 @@ export function createServer(): McpServer {
     {
       title: "Get state machine definition",
       description:
-        "Fetch the Amazon States Language definition for a state machine (or the machine behind an execution). Renders in the Definition tab.",
+        "Fetch the Amazon States Language definition for a state machine (or the machine behind an execution). Returns data only; the Definition tab inside show_execution's console displays it. Prefer show_execution for the interactive UI.",
       inputSchema: z.object({
         stateMachineArn: z.string().optional(),
         executionArn: z.string().optional(),
@@ -384,7 +383,6 @@ export function createServer(): McpServer {
       }),
       _meta: {
         ui: {
-          resourceUri: RESOURCE_URI,
           visibility: ["model", "app"],
         },
       },
