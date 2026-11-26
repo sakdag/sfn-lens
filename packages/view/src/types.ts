@@ -7,6 +7,8 @@ export type StateRunStatus =
   | "NOT_RUN"
   | "ABORTED";
 
+export type ConsoleTab = "graph" | "executions" | "definition";
+
 export interface LaidOutNode {
   id: string;
   name: string;
@@ -60,7 +62,13 @@ export interface ExecutionSummary {
   }>;
 }
 
+export interface Capabilities {
+  redriveEnabled?: boolean;
+  fixtureMode?: boolean;
+}
+
 export interface ShowExecutionPayload {
+  view?: "execution" | "executions" | "definition";
   executionArn: string;
   name: string;
   status: string;
@@ -82,6 +90,45 @@ export interface ShowExecutionPayload {
     path: string[];
     failedState?: string;
   };
+  definitionText?: string;
+  capabilities?: Capabilities;
+  redrivable?: boolean;
+}
+
+export interface ExecutionListItem {
+  executionArn: string;
+  name: string;
+  status: string;
+  startDate?: string;
+  stopDate?: string;
+  stateMachineArn: string;
+  fixtureId?: string;
+  description?: string;
+}
+
+export interface ExecutionsPayload {
+  view: "executions";
+  mode?: string;
+  stateMachineArn: string;
+  filters?: {
+    statusFilter?: string;
+    nameContains?: string;
+  };
+  executions: ExecutionListItem[];
+  nextToken?: string;
+  capabilities?: Capabilities;
+}
+
+export interface DefinitionPayload {
+  view: "definition";
+  stateMachineArn: string;
+  name?: string;
+  status?: string;
+  type?: string;
+  roleArn?: string;
+  creationDate?: string;
+  definitionText: string;
+  capabilities?: Capabilities;
 }
 
 export interface StateDetail {

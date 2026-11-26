@@ -10,14 +10,18 @@ The official MCP Apps SDK (`@modelcontextprotocol/ext-apps`) is TypeScript. The 
 
 ## Features
 
+- In-chat Step Functions **console**: graph, executions list, definition, redrive
 - ASL → graph (Task, Choice, Parallel, Map, Catch, Retry) with automatic layout
 - Execution overlay: succeeded / failed / caught / retried / not run + duration
 - Click-through state detail (app-only tools; default CSP stays closed — no direct AWS calls from the iframe)
+- Executions browser with status + name filters
+- Definition tab (Amazon States Language)
 - Compare two executions (path diff, duration deltas, first diverging state)
-- **Read-only** by default (no redrive in v0.1)
+- **Redrive** behind `SFN_LENS_ALLOW_REDRIVE=true` + explicit UI confirmation (app-only tool)
 - Redaction of configured JSONPath fields and common secret/PII keys before model or UI exposure
 - **Fixture mode** for offline use and CI
 - Cheap Terraform demo workflow + fault injection in `eu-north-1`
+- Light and dark themes (follows the host when available)
 
 ## Requirements
 
@@ -44,12 +48,15 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": ["/ABS/PATH/TO/sfn-lens/packages/server/dist/index.js"],
       "env": {
         "AWS_PROFILE": "personal",
-        "AWS_REGION": "eu-north-1"
+        "AWS_REGION": "eu-north-1",
+        "SFN_LENS_ALLOW_REDRIVE": "true"
       }
     }
   }
 }
 ```
+
+Omit `SFN_LENS_ALLOW_REDRIVE` (or set it to `false`) to keep the server mutation-free. Your IAM principal also needs `states:RedriveExecution` for redrive to succeed.
 
 Restart Claude Desktop. Then ask: “Show me the latest failed Step Functions execution” or pass an execution ARN.
 
@@ -68,12 +75,14 @@ Ask the assistant to `show_execution` with `fixtureId: "f1-lambda-error"`.
 
 | Tool | Visible to | Purpose |
 | --- | --- | --- |
-| `show_execution` | model + app | Graph + compact summary |
+| `show_execution` | model + app | Open console on one execution (graph) |
+| `list_executions` | model + app | Executions browser (status / name filters) |
+| `get_definition` | model + app | ASL definition tab |
 | `compare_executions` | model + app | Diff two runs |
 | `list_state_machines` | model | Discover state machine ARNs |
-| `list_executions` | model | Recent runs / fixtures for a machine |
 | `get_state_detail` | app only | Input/output/retries for one state |
 | `get_history_page` | app only | Paginated events for the UI |
+| `redrive_execution` | app only | Redrive after UI confirm (flag required) |
 
 ## Demo workflow
 
@@ -96,8 +105,10 @@ Tear down with `terraform destroy` when finished. Lambdas are 128 MB / 3 s timeo
 | `SFN_LENS_MODE` | `live` | `live` or `fixture` |
 | `SFN_LENS_FIXTURE_DIR` | repo `fixtures/` | Fixture JSON directory |
 | `SFN_LENS_REDACT_JSONPATHS` | _(empty)_ | Comma-separated paths, e.g. `$.customer.ssn` |
+| `SFN_LENS_ALLOW_REDRIVE` | off | Set `true` to allow the app-only redrive tool |
 
-IAM: read-only Step Functions (`List*`, `Describe*`, `GetExecutionHistory`) on the account you point at. Any state machine is allowed; scope the policy tighter in shared accounts if you need to.
+IAM (read path): `states:List*`, `Describe*`, `GetExecutionHistory`.  
+IAM (redrive): also `states:RedriveExecution`. Any state machine is allowed; scope tighter in shared accounts if you need to.
 
 ## Development
 

@@ -15,30 +15,30 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DefinitionPanel } from "./DefinitionPanel";
 import { DetailPanel } from "./DetailPanel";
+import { ExecutionsPanel } from "./ExecutionsPanel";
+import { RedriveDialog } from "./RedriveDialog";
 import { StateNode, type StateNodeData } from "./StateNode";
-import type { ShowExecutionPayload, StateDetail } from "./types";
+import type {
+  ConsoleTab,
+  DefinitionPayload,
+  ExecutionListItem,
+  ExecutionsPayload,
+  ShowExecutionPayload,
+  StateDetail,
+} from "./types";
 
 const nodeTypes = { state: StateNode };
-
-function asPayload(data: unknown): ShowExecutionPayload | null {
-  if (!data || typeof data !== "object") return null;
-  const obj = data as Record<string, unknown>;
-  if (obj.comparison && obj.right) {
-    return obj.right as ShowExecutionPayload;
-  }
-  if (obj.graph && obj.overlay) return obj as unknown as ShowExecutionPayload;
-  return null;
-}
-
-function isFixtureArn(arn: string | undefined): boolean {
-  return Boolean(arn?.includes(":000000000000:") || arn?.startsWith("fixture"));
-}
 
 function cssVar(name: string, fallback: string): string {
   if (typeof window === "undefined") return fallback;
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return v || fallback;
+}
+
+function isFixtureArn(arn: string | undefined): boolean {
+  return Boolean(arn?.includes(":000000000000:") || arn?.startsWith("fixture"));
 }
 
 export function App() {
@@ -47,17 +47,57 @@ export function App() {
   const [detail, setDetail] = useState<StateDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [hostContext, setHostContext] = useState<McpUiHostContext | undefined>();
+  const [tab, setTab] = useState<ConsoleTab>("graph");
+
+  const [executions, setExecutions] = useState<ExecutionListItem[]>([]);
+  const [execStateMachineArn, setExecStateMachineArn] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState("");
+  const [nameContains, setNameContains] = useState("");
+  const [loadingExecutions, setLoadingExecutions] = useState(false);
+
+  const [definitionText, setDefinitionText] = useState<string | undefined>();
+  const [definitionMeta, setDefinitionMeta] = useState<Partial<DefinitionPayload>>({});
+  const [loadingDefinition, setLoadingDefinition] = useState(false);
+
+  const [redriveOpen, setRedriveOpen] = useState(false);
+  const [redriveBusy, setRedriveBusy] = useState(false);
+  const [redriveError, setRedriveError] = useState<string | null>(null);
+  const [banner, setBanner] = useState<string | null>(null);
 
   const { app, error } = useApp({
     appInfo: { name: "sfn-lens", version: "0.1.0" },
     capabilities: {},
     onAppCreated: (created) => {
       created.ontoolresult = async (result) => {
-        const next = asPayload(result.structuredContent);
-        if (next) {
-          setPayload(next);
-          setSelected(next.failedState ?? next.overlay.failedState);
-          setDetail(null);
+        const data = result.structuredContent as Record<string, unknown> | undefined;
+        if (!data) return;
+
+        if (data.view === "executions" || (Array.isArray(data.executions) && !data.graph)) {
+          const list = data as unknown as ExecutionsPayload;
+          setExecutions(list.executions ?? []);
+          setExecStateMachineArn(list.stateMachineArn);
+          setStatusFilter(list.filters?.statusFilter ?? "");
+          setNameContains(list.filters?.nameContains ?? "");
+          setTab("executions");
+          return;
+        }
+
+        if (data.view === "definition" || (typeof data.definitionText === "string" && !data.graph)) {
+          const def = data as unknown as DefinitionPayload;
+          setDefinitionText(def.definitionText);
+          setDefinitionMeta(def);
+          setTab("definition");
+          return;
+        }
+
+        if (data.comparison && data.right) {
+          const right = data.right as ShowExecutionPayload;
+          applyExecution(right);
+          return;
+        }
+
+        if (data.graph && data.overlay) {
+          applyExecution(data as unknown as ShowExecutionPayload);
         }
       };
       created.onhostcontextchanged = (ctx) => {
@@ -67,12 +107,126 @@ export function App() {
     },
   });
 
+  function applyExecution(next: ShowExecutionPayload) {
+    setPayload(next);
+    setSelected(next.failedState ?? next.overlay.failedState);
+    setDetail(null);
+    setExecStateMachineArn(next.stateMachineArn);
+    if (next.definitionText) {
+      setDefinitionText(next.definitionText);
+      setDefinitionMeta({
+        stateMachineArn: next.stateMachineArn,
+        name: next.stateMachineArn.split(":").pop(),
+        definitionText: next.definitionText,
+      });
+    }
+    setTab("graph");
+    setBanner(null);
+  }
+
   useEffect(() => {
     if (app) setHostContext(app.getHostContext());
   }, [app]);
 
   useHostStyles(app, hostContext);
   const theme = useDocumentTheme();
+
+  const refreshExecutions = useCallback(
+    async (
+      mcp: McpApp,
+      opts?: { stateMachineArn?: string; statusFilter?: string; nameContains?: string },
+    ) => {
+      const sm =
+        opts?.stateMachineArn ?? execStateMachineArn ?? payload?.stateMachineArn;
+      if (!sm) return;
+      setLoadingExecutions(true);
+      try {
+        const result = await mcp.callServerTool({
+          name: "list_executions",
+          arguments: {
+            stateMachineArn: sm === "fixture" ? undefined : sm,
+            statusFilter: (opts?.statusFilter ?? statusFilter) || undefined,
+            nameContains: (opts?.nameContains ?? nameContains) || undefined,
+            maxResults: 50,
+          },
+        });
+        const data = result.structuredContent as ExecutionsPayload | undefined;
+        if (data?.executions) {
+          setExecutions(data.executions);
+          setExecStateMachineArn(data.stateMachineArn ?? sm);
+        }
+      } catch (e) {
+        console.error(e);
+        setBanner(e instanceof Error ? e.message : "Failed to list executions");
+      } finally {
+        setLoadingExecutions(false);
+      }
+    },
+    [execStateMachineArn, payload?.stateMachineArn, statusFilter, nameContains],
+  );
+
+  const loadDefinition = useCallback(
+    async (mcp: McpApp) => {
+      const sm = payload?.stateMachineArn ?? execStateMachineArn;
+      if (!sm) return;
+      if (definitionText && definitionMeta.stateMachineArn === sm) return;
+      setLoadingDefinition(true);
+      try {
+        const result = await mcp.callServerTool({
+          name: "get_definition",
+          arguments: {
+            stateMachineArn: sm === "fixture" ? undefined : sm,
+            executionArn: payload?.executionArn?.startsWith("fixture:")
+              ? undefined
+              : payload?.executionArn,
+            fixtureId: payload?.executionArn?.startsWith("fixture:")
+              ? payload.name
+              : undefined,
+          },
+        });
+        const data = result.structuredContent as DefinitionPayload | undefined;
+        if (data?.definitionText) {
+          setDefinitionText(data.definitionText);
+          setDefinitionMeta(data);
+        }
+      } catch (e) {
+        console.error(e);
+        setBanner(e instanceof Error ? e.message : "Failed to load definition");
+      } finally {
+        setLoadingDefinition(false);
+      }
+    },
+    [
+      payload?.stateMachineArn,
+      payload?.executionArn,
+      payload?.name,
+      execStateMachineArn,
+      definitionText,
+      definitionMeta.stateMachineArn,
+    ],
+  );
+
+  const openExecution = useCallback(
+    async (mcp: McpApp, item: ExecutionListItem) => {
+      setBanner(null);
+      try {
+        const result = await mcp.callServerTool({
+          name: "show_execution",
+          arguments: item.fixtureId
+            ? { fixtureId: item.fixtureId }
+            : item.executionArn.startsWith("fixture:")
+              ? { fixtureId: item.name }
+              : { executionArn: item.executionArn },
+        });
+        const data = result.structuredContent as ShowExecutionPayload | undefined;
+        if (data?.graph) applyExecution(data);
+      } catch (e) {
+        console.error(e);
+        setBanner(e instanceof Error ? e.message : "Failed to open execution");
+      }
+    },
+    [],
+  );
 
   const onSelectState = useCallback(
     async (mcp: McpApp, stateName: string, current: ShowExecutionPayload) => {
@@ -82,7 +236,14 @@ export function App() {
         const result = await mcp.callServerTool({
           name: "get_state_detail",
           arguments: {
-            executionArn: current.executionArn,
+            executionArn: current.executionArn.startsWith("fixture:")
+              ? undefined
+              : current.executionArn,
+            fixtureId: current.executionArn.startsWith("fixture:")
+              ? current.name
+              : isFixtureArn(current.executionArn)
+                ? current.name
+                : undefined,
             stateName,
           },
         });
@@ -98,12 +259,6 @@ export function App() {
                 `Status: ${d?.status ?? overlay?.status ?? "unknown"}`,
                 d?.error || overlay?.error ? `Error: ${d?.error ?? overlay?.error}` : null,
                 d?.cause || overlay?.cause ? `Cause: ${d?.cause ?? overlay?.cause}` : null,
-                d?.input !== undefined
-                  ? `Input (redacted, truncated): ${JSON.stringify(d.input).slice(0, 800)}`
-                  : null,
-                d?.output !== undefined
-                  ? `Output (redacted, truncated): ${JSON.stringify(d.output).slice(0, 800)}`
-                  : null,
               ]
                 .filter(Boolean)
                 .join("\n"),
@@ -126,8 +281,38 @@ export function App() {
     [],
   );
 
+  const confirmRedrive = useCallback(
+    async (mcp: McpApp, current: ShowExecutionPayload) => {
+      setRedriveBusy(true);
+      setRedriveError(null);
+      try {
+        const result = await mcp.callServerTool({
+          name: "redrive_execution",
+          arguments: { executionArn: current.executionArn, confirm: true },
+        });
+        const redriveDate = (result.structuredContent as { redriveDate?: string } | undefined)
+          ?.redriveDate;
+        setRedriveOpen(false);
+        setBanner(
+          `Redrive started${redriveDate ? ` at ${redriveDate}` : ""}. Refreshing execution…`,
+        );
+        const refreshed = await mcp.callServerTool({
+          name: "show_execution",
+          arguments: { executionArn: current.executionArn },
+        });
+        const data = refreshed.structuredContent as ShowExecutionPayload | undefined;
+        if (data?.graph) applyExecution(data);
+        await refreshExecutions(mcp, { stateMachineArn: current.stateMachineArn });
+      } catch (e) {
+        setRedriveError(e instanceof Error ? e.message : "Redrive failed");
+      } finally {
+        setRedriveBusy(false);
+      }
+    },
+    [refreshExecutions],
+  );
+
   const palette = useMemo(() => {
-    // Re-read when theme flips so edges/background stay in sync.
     void theme;
     return {
       idle: cssVar("--edge-idle", "#687078"),
@@ -184,7 +369,8 @@ export function App() {
         id: e.id,
         source: e.source,
         target: e.target,
-        label: e.kind === "choice" || e.kind === "default" || e.kind === "catch" ? e.label : undefined,
+        label:
+          e.kind === "choice" || e.kind === "default" || e.kind === "catch" ? e.label : undefined,
         type: "smoothstep",
         animated: onFailPath,
         style: {
@@ -217,6 +403,10 @@ export function App() {
   }
 
   const fixture = payload ? isFixtureArn(payload.executionArn) : false;
+  const showRedrive =
+    Boolean(payload?.capabilities?.redriveEnabled) &&
+    Boolean(payload?.redrivable) &&
+    !fixture;
 
   return (
     <div className="app">
@@ -235,52 +425,146 @@ export function App() {
             ) : null}
           </>
         ) : (
-          <span className="meta">Waiting for show_execution…</span>
+          <span className="meta">Open an execution or browse the list</span>
         )}
-      </header>
-      <div className="body">
-        <div className="graph-pane">
-          {payload ? (
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              fitView
-              fitViewOptions={{ padding: 0.18 }}
-              minZoom={0.35}
-              maxZoom={1.5}
-              nodesDraggable={false}
-              nodesConnectable={false}
-              elementsSelectable
-              colorMode={theme === "dark" ? "dark" : "light"}
-              onNodeClick={(_, node) => {
-                const name = (node.data as StateNodeData).name;
-                void onSelectState(app, name, payload);
+        <div className="header-actions">
+          {showRedrive ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => {
+                setRedriveError(null);
+                setRedriveOpen(true);
               }}
-              proOptions={{ hideAttribution: true }}
-              defaultEdgeOptions={{ type: "smoothstep" }}
             >
-              <Background
-                variant={BackgroundVariant.Dots}
-                gap={18}
-                size={1.2}
-                color={palette.dots}
-              />
-              <Controls showInteractive={false} />
-            </ReactFlow>
-          ) : (
-            <div className="empty">No execution loaded.</div>
-          )}
+              Redrive
+            </button>
+          ) : null}
         </div>
-        <DetailPanel
-          stateName={selected}
-          overlay={selected ? payload?.overlay.states[selected] : undefined}
-          detail={detail}
-          loading={loadingDetail}
-          executionError={payload?.error}
-          executionCause={payload?.cause}
+      </header>
+
+      <nav className="tabs" aria-label="Console views">
+        <button
+          type="button"
+          className={tab === "graph" ? "tab active" : "tab"}
+          onClick={() => setTab("graph")}
+          disabled={!payload}
+        >
+          Graph
+        </button>
+        <button
+          type="button"
+          className={tab === "executions" ? "tab active" : "tab"}
+          onClick={() => {
+            setTab("executions");
+            void refreshExecutions(app);
+          }}
+        >
+          Executions
+        </button>
+        <button
+          type="button"
+          className={tab === "definition" ? "tab active" : "tab"}
+          onClick={() => {
+            setTab("definition");
+            void loadDefinition(app);
+          }}
+        >
+          Definition
+        </button>
+      </nav>
+
+      {banner ? <div className="banner">{banner}</div> : null}
+
+      {tab === "graph" ? (
+        <div className="body">
+          <div className="graph-pane">
+            {payload ? (
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                nodeTypes={nodeTypes}
+                fitView
+                fitViewOptions={{ padding: 0.18 }}
+                minZoom={0.35}
+                maxZoom={1.5}
+                nodesDraggable={false}
+                nodesConnectable={false}
+                elementsSelectable
+                colorMode={theme === "dark" ? "dark" : "light"}
+                onNodeClick={(_, node) => {
+                  const name = (node.data as StateNodeData).name;
+                  void onSelectState(app, name, payload);
+                }}
+                proOptions={{ hideAttribution: true }}
+                defaultEdgeOptions={{ type: "smoothstep" }}
+              >
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={18}
+                  size={1.2}
+                  color={palette.dots}
+                />
+                <Controls showInteractive={false} />
+              </ReactFlow>
+            ) : (
+              <div className="empty">No execution loaded. Use the Executions tab or ask the model to show one.</div>
+            )}
+          </div>
+          <DetailPanel
+            stateName={selected}
+            overlay={selected ? payload?.overlay.states[selected] : undefined}
+            detail={detail}
+            loading={loadingDetail}
+            executionError={payload?.error}
+            executionCause={payload?.cause}
+          />
+        </div>
+      ) : null}
+
+      {tab === "executions" ? (
+        <ExecutionsPanel
+          stateMachineArn={execStateMachineArn ?? payload?.stateMachineArn}
+          executions={executions}
+          statusFilter={statusFilter}
+          nameContains={nameContains}
+          loading={loadingExecutions}
+          activeArn={payload?.executionArn}
+          onStatusFilter={(v) => {
+            setStatusFilter(v);
+            void refreshExecutions(app, { statusFilter: v });
+          }}
+          onNameContains={(v) => {
+            setNameContains(v);
+            void refreshExecutions(app, { nameContains: v });
+          }}
+          onRefresh={() => void refreshExecutions(app)}
+          onOpen={(item) => void openExecution(app, item)}
         />
-      </div>
+      ) : null}
+
+      {tab === "definition" ? (
+        <DefinitionPanel
+          name={definitionMeta.name}
+          stateMachineArn={definitionMeta.stateMachineArn ?? payload?.stateMachineArn}
+          type={definitionMeta.type}
+          status={definitionMeta.status}
+          roleArn={definitionMeta.roleArn}
+          definitionText={definitionText}
+          loading={loadingDefinition}
+        />
+      ) : null}
+
+      {redriveOpen && payload ? (
+        <RedriveDialog
+          executionName={payload.name}
+          executionArn={payload.executionArn}
+          busy={redriveBusy}
+          error={redriveError}
+          onCancel={() => setRedriveOpen(false)}
+          onConfirm={() => void confirmRedrive(app, payload)}
+        />
+      ) : null}
     </div>
   );
 }

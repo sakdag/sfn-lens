@@ -4,7 +4,7 @@
 
 - The MCP App view runs in a **sandboxed iframe**. Default CSP keeps `connect-src` closed; the view does not call AWS (or any network) directly.
 - All data reaches the view through **host-proxied** `tools/call` responses.
-- Mutating Step Functions APIs (redrive, start execution, stop) are **not** exposed in v0.1.
+- Mutating APIs are off by default. **Redrive** is available only when `SFN_LENS_ALLOW_REDRIVE=true`, via an **app-only** tool that requires `confirm: true` after an explicit UI confirmation. Start-execution and stop are not exposed yet.
 
 ## Credentials
 

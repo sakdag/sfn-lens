@@ -4,10 +4,12 @@ import {
   GetExecutionHistoryCommand,
   ListExecutionsCommand,
   ListStateMachinesCommand,
+  RedriveExecutionCommand,
   SFNClient,
   type HistoryEvent,
 } from "@aws-sdk/client-sfn";
 import type { AslDefinition, HistoryEvent as CoreHistoryEvent } from "@sfn-lens/core";
+import { randomUUID } from "node:crypto";
 
 export function createSfnClient(): SFNClient {
   const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "eu-north-1";
@@ -84,30 +86,41 @@ export async function loadLiveExecution(
   };
 }
 
+export type ExecutionListItem = {
+  executionArn: string;
+  name: string;
+  status: string;
+  startDate?: string;
+  stopDate?: string;
+  stateMachineArn: string;
+};
+
 export async function listRecentExecutions(
   client: SFNClient,
   params: {
     stateMachineArn?: string;
     statusFilter?: string;
     maxResults?: number;
+    nameContains?: string;
+    nextToken?: string;
   },
-): Promise<
-  Array<{
-    executionArn: string;
-    name: string;
-    status: string;
-    startDate?: string;
-    stopDate?: string;
-    stateMachineArn: string;
-  }>
-> {
+): Promise<{
+  executions: ExecutionListItem[];
+  nextToken?: string;
+  stateMachineArn: string;
+}> {
   let stateMachineArn = params.stateMachineArn;
   if (!stateMachineArn) {
     const machines = await client.send(new ListStateMachinesCommand({ maxResults: 50 }));
     const first = machines.stateMachines?.[0]?.stateMachineArn;
-    if (!first) return [];
+    if (!first) return { executions: [], stateMachineArn: "" };
     stateMachineArn = first;
   }
+
+  // Fetch a wider page when name-filtering client-side.
+  const apiMax = params.nameContains
+    ? Math.min(100, Math.max(params.maxResults ?? 50, 50))
+    : (params.maxResults ?? 25);
 
   const out = await client.send(
     new ListExecutionsCommand({
@@ -120,11 +133,12 @@ export async function listRecentExecutions(
         | "ABORTED"
         | "PENDING_REDRIVE"
         | undefined,
-      maxResults: params.maxResults ?? 20,
+      maxResults: apiMax,
+      nextToken: params.nextToken,
     }),
   );
 
-  return (out.executions ?? []).map((e) => ({
+  let executions: ExecutionListItem[] = (out.executions ?? []).map((e) => ({
     executionArn: e.executionArn!,
     name: e.name!,
     status: e.status!,
@@ -132,6 +146,69 @@ export async function listRecentExecutions(
     stopDate: e.stopDate?.toISOString(),
     stateMachineArn: stateMachineArn!,
   }));
+
+  if (params.nameContains?.trim()) {
+    const q = params.nameContains.trim().toLowerCase();
+    executions = executions.filter((e) => e.name.toLowerCase().includes(q));
+    if (params.maxResults) executions = executions.slice(0, params.maxResults);
+  }
+
+  return {
+    executions,
+    nextToken: out.nextToken,
+    stateMachineArn,
+  };
+}
+
+export async function describeStateMachineDetails(
+  client: SFNClient,
+  stateMachineArn: string,
+): Promise<{
+  stateMachineArn: string;
+  name: string;
+  status?: string;
+  type?: string;
+  roleArn?: string;
+  creationDate?: string;
+  definition: AslDefinition;
+  definitionText: string;
+}> {
+  const sm = await client.send(new DescribeStateMachineCommand({ stateMachineArn }));
+  if (!sm.definition || !sm.stateMachineArn || !sm.name) {
+    throw new Error(`Incomplete DescribeStateMachine for ${stateMachineArn}`);
+  }
+  let definition: AslDefinition;
+  try {
+    definition = JSON.parse(sm.definition) as AslDefinition;
+  } catch {
+    throw new Error("State machine definition is not valid JSON");
+  }
+  return {
+    stateMachineArn: sm.stateMachineArn,
+    name: sm.name,
+    status: sm.status,
+    type: sm.type,
+    roleArn: sm.roleArn,
+    creationDate: sm.creationDate?.toISOString(),
+    definition,
+    definitionText: JSON.stringify(definition, null, 2),
+  };
+}
+
+export async function redriveExecution(
+  client: SFNClient,
+  executionArn: string,
+): Promise<{ executionArn: string; redriveDate: string }> {
+  const out = await client.send(
+    new RedriveExecutionCommand({
+      executionArn,
+      clientToken: randomUUID(),
+    }),
+  );
+  return {
+    executionArn,
+    redriveDate: out.redriveDate?.toISOString() ?? new Date().toISOString(),
+  };
 }
 
 async function fetchAllHistory(
