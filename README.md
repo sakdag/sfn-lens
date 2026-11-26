@@ -1,44 +1,31 @@
 # sfn-lens
 
-Inspect AWS Step Functions executions **inside your AI chat**.
+Step Functions debugging without leaving chat.
 
-sfn-lens is an [MCP App](https://modelcontextprotocol.io/extensions/apps/overview): the model calls a tool, and Claude Desktop renders an interactive state-machine graph with status, duration, and the failed path highlighted. Bulky history stays in the UI; the model receives a compact structured summary. Click a state to load input/output/retries and update what the model knows for follow-up questions.
-
-## Why TypeScript
-
-The official MCP Apps SDK (`@modelcontextprotocol/ext-apps`) is TypeScript. The MCP server and the sandboxed view share one language and one build.
-
-## Features
-
-- In-chat Step Functions **console**: graph, executions list, definition, redrive
-- ASL → graph (Task, Choice, Parallel, Map, Catch, Retry) with automatic layout
-- Execution overlay: succeeded / failed / caught / retried / not run + duration
-- Click-through state detail (app-only tools; default CSP stays closed — no direct AWS calls from the iframe)
-- Executions browser with status + name filters
-- Definition tab (Amazon States Language)
-- Compare two executions (path diff, duration deltas, first diverging state)
-- **Redrive** behind `SFN_LENS_ALLOW_REDRIVE=true` + explicit UI confirmation (app-only tool)
-- Redaction of configured JSONPath fields and common secret/PII keys before model or UI exposure
-- **Fixture mode** for offline use and CI
-- Cheap Terraform demo workflow + fault injection in `eu-north-1`
-- Light and dark themes (follows the host when available)
-- **Refresh** on the open execution; auto-polls while status is `RUNNING`
+Ask Claude about a failed run and get an interactive console in the reply: the state machine graph with status and timings, click-through input/output, an executions list, the ASL definition, and optional redrive. Same idea as the AWS console — sitting next to the conversation.
 
 ![Failed execution graph in chat](docs/images/console-graph.png)
 
-*Graph tab — failed path highlighted, state detail on the right.*
-
 ![Executions list with filters](docs/images/console-executions.png)
 
-*Executions tab — filter by status/name and open another run.*
+Built as an [MCP App](https://modelcontextprotocol.io/extensions/apps/overview) for Claude Desktop (local AWS credentials over stdio).
 
-## Requirements
+## What you can do
 
-- Node.js 20+
-- AWS credentials that can call Step Functions read APIs (profile `personal` by default)
-- Claude Desktop (MCP Apps + stdio)
+- Open any execution and see the graph (Task, Choice, Parallel, Map, Catch, Retry)
+- Follow the failed path; click a state for input, output, errors, and retries
+- Browse recent executions with status / name filters
+- Read the state machine definition
+- Compare two runs
+- Redrive a failed execution (opt-in; needs a confirm click)
+- Refresh a live run; running executions poll automatically
+- Try fixtures with no AWS account
 
-## Install (Claude Desktop)
+The UI never talks to AWS directly — everything goes through the MCP server with your local credentials. Sensitive fields can be redacted before they hit the model or the panel.
+
+## Setup (Claude Desktop)
+
+Needs Node 20+ and an AWS profile that can read Step Functions.
 
 ```bash
 git clone git@github.com:sakdag/sfn-lens.git
@@ -47,7 +34,7 @@ npm install
 npm run build
 ```
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+In `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -57,21 +44,24 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": ["/ABS/PATH/TO/sfn-lens/packages/server/dist/index.js"],
       "env": {
         "AWS_PROFILE": "personal",
-        "AWS_REGION": "eu-north-1",
-        "SFN_LENS_ALLOW_REDRIVE": "true"
+        "AWS_REGION": "eu-north-1"
       }
     }
   }
 }
 ```
 
-Omit `SFN_LENS_ALLOW_REDRIVE` (or set it to `false`) to keep the server mutation-free. Your IAM principal also needs `states:RedriveExecution` for redrive to succeed.
+Quit Claude fully and reopen. Then try:
 
-Restart Claude Desktop. Then ask something like: “Show me the latest failed Step Functions run on sfn-lens-demo.”
+> Show me the latest failed Step Functions run on my account — use sfn-lens so I can see the graph.
 
-**Live updates:** use **Refresh** in the console header. While an execution is `RUNNING`, the graph auto-refreshes every few seconds. Redrive keeps the same execution ARN — if the workflow fails the same way again (e.g. a `Reject` path with the same input), status will still show `FAILED` after redrive; check `redriven ×N` in the header.
+### Redrive (optional)
 
-### Fixture mode (no AWS)
+Add `"SFN_LENS_ALLOW_REDRIVE": "true"` to the `env` block and grant `states:RedriveExecution` on your IAM principal. Leave it off if you want read-only.
+
+Redrive reuses the same execution ARN. If the workflow fails the same way again (same input, same `Reject` path, etc.), status will still be `FAILED` — look for `redriven ×N` in the header.
+
+### Try without AWS
 
 ```json
 "env": {
@@ -80,22 +70,11 @@ Restart Claude Desktop. Then ask something like: “Show me the latest failed St
 }
 ```
 
-Ask the assistant to `show_execution` with `fixtureId: "f1-lambda-error"`.
+Ask Claude to show fixture `f1-lambda-error`.
 
-## Tools
+## Sample workflow
 
-| Tool | Visible to | Purpose |
-| --- | --- | --- |
-| `show_execution` | model + app | **Only tool that opens the UI** — console on one execution |
-| `list_executions` | model + app | Data only (status / name filters); console Executions tab also uses this |
-| `get_definition` | model + app | Data only; console Definition tab also uses this |
-| `compare_executions` | model + app | Diff two runs |
-| `list_state_machines` | model | Discover state machine ARNs |
-| `get_state_detail` | app only | Input/output/retries for one state |
-| `get_history_page` | app only | Paginated events for the UI |
-| `redrive_execution` | app only | Redrive after UI confirm (flag required) |
-
-## Demo workflow
+A small Terraform demo in `eu-north-1` plus a fault-injection script, useful for trying the UI end to end:
 
 ```bash
 cd demo/terraform
@@ -105,21 +84,23 @@ export STATE_MACHINE_ARN=$(AWS_PROFILE=personal terraform output -raw state_mach
 bash ../scripts/inject_faults.sh
 ```
 
-Tear down with `terraform destroy` when finished. Lambdas are 128 MB / 3 s timeout to keep cost near zero.
+`terraform destroy` when you’re done. The Lambda is tiny on purpose.
 
 ## Configuration
 
-| Env | Default | Meaning |
+| Env | Default | Notes |
 | --- | --- | --- |
 | `AWS_PROFILE` | `personal` | Shared credentials profile |
-| `AWS_REGION` | `eu-north-1` | Region for the SFN client |
+| `AWS_REGION` | `eu-north-1` | Step Functions region |
 | `SFN_LENS_MODE` | `live` | `live` or `fixture` |
-| `SFN_LENS_FIXTURE_DIR` | repo `fixtures/` | Fixture JSON directory |
-| `SFN_LENS_REDACT_JSONPATHS` | _(empty)_ | Comma-separated paths, e.g. `$.customer.ssn` |
-| `SFN_LENS_ALLOW_REDRIVE` | off | Set `true` to allow the app-only redrive tool |
+| `SFN_LENS_FIXTURE_DIR` | `fixtures/` | Offline recordings |
+| `SFN_LENS_REDACT_JSONPATHS` | — | e.g. `$.customer.ssn,$.claimant.email` |
+| `SFN_LENS_ALLOW_REDRIVE` | off | Set `true` to enable redrive |
 
-IAM (read path): `states:List*`, `Describe*`, `GetExecutionHistory`.  
-IAM (redrive): also `states:RedriveExecution`. Any state machine is allowed; scope tighter in shared accounts if you need to.
+Read IAM: `states:List*`, `Describe*`, `GetExecutionHistory`.  
+Redrive: also `states:RedriveExecution`.
+
+More on trust boundaries: [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ## Development
 
@@ -127,10 +108,10 @@ IAM (redrive): also `states:RedriveExecution`. Any state machine is allowed; sco
 npm install
 npm run build
 npm test
-npm run start:stdio   # for manual MCP checks
+npm run start:stdio
 ```
 
-Eval notes: [`docs/EVAL.md`](docs/EVAL.md). Security notes: [`docs/SECURITY.md`](docs/SECURITY.md).
+TypeScript throughout (MCP Apps SDK + UI in one toolchain).
 
 ## Licence
 
