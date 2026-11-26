@@ -11,7 +11,6 @@ def handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
     step = event.get("step", "unknown")
     fault = event.get("fault") or (event.get("Payload") or {}).get("fault")
 
-    # Normalize if Step Functions wrapped the payload
     if isinstance(event.get("fault"), str):
         fault = event["fault"]
 
@@ -24,10 +23,12 @@ def handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
         if fault == "lambda_error":
             raise RuntimeError("injected lambda failure")
         if fault == "timeout":
+            # Longer than ProcessFail.TimeoutSeconds (4s) so SFN times the task out.
             time.sleep(10)
         if fault == "throttle":
-            # Simulate a retryable service error once then succeed path via SFN retry config
             raise Exception("Rate exceeded")
+        if fault == "caught_then_fail":
+            raise RuntimeError("injected for catch path")
         return {"ok": True, "fault": fault, "processed": True}
 
     if step == "map_item":

@@ -1,24 +1,34 @@
 # Fixtures
 
-These JSON files are **synthetic** offline histories for fixture mode and the diagnosis eval.
+Offline execution JSON for fixture mode and the diagnosis eval.
 
-They are produced by `scripts/generate-fixtures.mjs` (fake account `000000000000`, scripted event sequences that mirror the demo ASL faults). They are **not** downloads from `GetExecutionHistory`.
+| Id | Fault | Expected status |
+| --- | --- | --- |
+| `f1-lambda-error` | Uncaught Lambda failure on `ProcessFail` | `FAILED` |
+| `f2-timeout` | Task timeout on `ProcessFail` | `TIMED_OUT` |
+| `f3-throttle` | Retries exhausted on `ProcessThrottle` | `FAILED` |
+| `f4-map-partial` | Map item failure | `FAILED` |
+| `f4-map-large` | Large Map (synthetic); failure on last item | `FAILED` |
+| `f5-caught-then-fail` | Catch then `FailAfterCatch` | `FAILED` |
+| `f6-reject` | Choice → `Reject` | `FAILED` |
+| `ok-success` | Happy path | `SUCCEEDED` |
 
-| Id | Fault |
-| --- | --- |
-| `f1-lambda-error` | Uncaught Lambda failure on `Process` |
-| `f2-timeout` | Task timeout on `Process` (caught → Done) |
-| `f3-throttle` | Retries then Catch → Done |
-| `f4-map-partial` | Map item failure |
-| `f4-map-large` | Large Map (80 items); failure on the last item |
-| `f5-caught-then-fail` | Catch then `FailAfterCatch` |
-| `f6-reject` | Choice → `Reject` |
-| `ok-success` | Happy path |
+Each file has `"source": "recorded"` (from a real `GetExecutionHistory`) or `"source": "synthetic"`.
 
-To regenerate:
+## Record from the live demo
 
 ```bash
-npm run fixtures:generate
+cd demo/terraform && terraform apply
+export STATE_MACHINE_ARN=$(terraform output -raw state_machine_arn)
+bash ../scripts/inject_faults.sh
+# optional large Map (kept synthetic by default — expensive):
+# aws stepfunctions start-execution --state-machine-arn "$STATE_MACHINE_ARN" \
+#   --name "f4large-$(date +%s)" --input '{"fault":"map_partial","items":[...]}'
+
+cd ../..
+npm run fixtures:record
 ```
 
-To replace with real recordings later: deploy `demo/terraform`, run `demo/scripts/inject_faults.sh`, then save each execution’s definition + history into this directory (same schema, with real account ARNs).
+## Synthetic generator
+
+`npm run fixtures:generate` rebuilds scripted histories (useful without AWS). Prefer recorded fixtures when sharing eval numbers.

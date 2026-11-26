@@ -170,13 +170,17 @@ export function App() {
   useHostStyles(app, hostContext);
   const theme = useDocumentTheme();
 
-  // Side/fullscreen pane: fill the iframe. Inline chat: keep a compact workspace
-  // so host auto-resize does not leave a giant empty chin.
+  // Graph in a side/fullscreen pane may fill the iframe. Executions/Definition
+  // stay content-sized so host auto-resize can shrink after filters (no chin).
   useEffect(() => {
     const update = () => {
       const mode = hostContext?.displayMode;
-      const tall = typeof window !== "undefined" && window.innerHeight >= 560;
-      const next = mode === "fullscreen" || mode === "pip" || tall;
+      const explicitPane = mode === "fullscreen" || mode === "pip";
+      const tallGraph =
+        tab === "graph" &&
+        typeof window !== "undefined" &&
+        window.innerHeight >= 560;
+      const next = explicitPane || tallGraph;
       setFillHost(next);
       document.documentElement.classList.toggle("fill-host", next);
     };
@@ -186,7 +190,7 @@ export function App() {
       window.removeEventListener("resize", update);
       document.documentElement.classList.remove("fill-host");
     };
-  }, [hostContext?.displayMode]);
+  }, [hostContext?.displayMode, tab]);
 
   useEffect(() => {
     if (!rf || tab !== "graph") return;

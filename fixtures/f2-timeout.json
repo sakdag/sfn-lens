@@ -1,122 +1,149 @@
 {
-  "source": "synthetic",
   "id": "f2-timeout",
-  "description": "Process task times out (caught, execution still succeeds via HandleError→Done)",
+  "source": "recorded",
+  "description": "Recorded from f2-1795712284 (FAILED)",
   "faultId": "F2",
   "execution": {
-    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f2-timeout",
-    "name": "f2-timeout",
-    "status": "SUCCEEDED",
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f2-1795712284",
+    "name": "f2-1795712284",
+    "status": "FAILED",
     "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
-    "startDate": "2026-11-26T12:00:00.000Z",
-    "stopDate": "2026-11-26T12:00:03.950Z"
+    "startDate": "2026-11-26T16:58:04.617Z",
+    "stopDate": "2026-11-26T16:58:08.873Z",
+    "error": "States.Timeout",
+    "input": "{\"fault\":\"timeout\"}"
   },
   "definition": {
     "Comment": "sfn-lens demo — cheap fault-injection workflow",
     "StartAt": "Validate",
     "States": {
-      "Validate": {
-        "Type": "Task",
-        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-        "Parameters": {
-          "step": "validate",
-          "fault.$": "$.fault"
-        },
-        "Next": "Route"
+      "Done": {
+        "Type": "Succeed"
       },
-      "Route": {
-        "Type": "Choice",
-        "Choices": [
-          {
-            "Variable": "$.fault",
-            "StringEquals": "reject",
-            "Next": "Reject"
-          }
-        ],
-        "Default": "MaybeMap"
+      "FailAfterCatch": {
+        "Cause": "recovered from task error then failed deliberately",
+        "Error": "CaughtThenFailed",
+        "Type": "Fail"
       },
       "MaybeMap": {
-        "Type": "Choice",
         "Choices": [
           {
-            "Variable": "$.fault",
+            "Next": "ProcessMap",
             "StringEquals": "map_partial",
-            "Next": "ProcessMap"
+            "Variable": "$.fault"
           }
         ],
-        "Default": "Process"
+        "Default": "PickProcess",
+        "Type": "Choice"
       },
-      "ProcessMap": {
-        "Type": "Map",
-        "ItemsPath": "$.items",
-        "MaxConcurrency": 2,
-        "Iterator": {
-          "StartAt": "MapItem",
-          "States": {
-            "MapItem": {
-              "Type": "Task",
-              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-              "Parameters": {
-                "step": "map_item",
-                "item.$": "$"
-              },
-              "End": true
-            }
-          }
-        },
-        "Next": "Done"
-      },
-      "Process": {
-        "Type": "Task",
-        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-        "Parameters": {
-          "step": "process",
-          "fault.$": "$.fault"
-        },
-        "Retry": [
+      "PickProcess": {
+        "Choices": [
           {
-            "ErrorEquals": [
-              "States.ALL"
-            ],
-            "IntervalSeconds": 1,
-            "MaxAttempts": 2,
-            "BackoffRate": 1.5
+            "Next": "ProcessCatch",
+            "StringEquals": "caught_then_fail",
+            "Variable": "$.fault"
+          },
+          {
+            "Next": "ProcessThrottle",
+            "StringEquals": "throttle",
+            "Variable": "$.fault"
           }
         ],
+        "Default": "ProcessFail",
+        "Type": "Choice"
+      },
+      "ProcessCatch": {
         "Catch": [
           {
             "ErrorEquals": [
               "States.ALL"
             ],
-            "Next": "HandleError",
+            "Next": "FailAfterCatch",
             "ResultPath": "$.error"
           }
         ],
-        "Next": "Done"
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "Type": "Task"
       },
-      "HandleError": {
-        "Type": "Choice",
-        "Choices": [
+      "ProcessFail": {
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "TimeoutSeconds": 4,
+        "Type": "Task"
+      },
+      "ProcessMap": {
+        "ItemsPath": "$.items",
+        "Iterator": {
+          "StartAt": "MapItem",
+          "States": {
+            "MapItem": {
+              "End": true,
+              "Parameters": {
+                "item.$": "$",
+                "step": "map_item"
+              },
+              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+              "Type": "Task"
+            }
+          }
+        },
+        "MaxConcurrency": 2,
+        "Next": "Done",
+        "Type": "Map"
+      },
+      "ProcessThrottle": {
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "Retry": [
           {
-            "Variable": "$.fault",
-            "StringEquals": "caught_then_fail",
-            "Next": "FailAfterCatch"
+            "BackoffRate": 1.5,
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 2
           }
         ],
-        "Default": "Done"
-      },
-      "FailAfterCatch": {
-        "Type": "Fail",
-        "Error": "CaughtThenFailed",
-        "Cause": "recovered from task error then failed deliberately"
+        "Type": "Task"
       },
       "Reject": {
-        "Type": "Fail",
+        "Cause": "validation rejected",
         "Error": "Rejected",
-        "Cause": "validation rejected"
+        "Type": "Fail"
       },
-      "Done": {
-        "Type": "Succeed"
+      "Route": {
+        "Choices": [
+          {
+            "Next": "Reject",
+            "StringEquals": "reject",
+            "Variable": "$.fault"
+          }
+        ],
+        "Default": "MaybeMap",
+        "Type": "Choice"
+      },
+      "Validate": {
+        "Next": "Route",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "validate"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "ResultPath": "$.validate",
+        "Type": "Task"
       }
     }
   },
@@ -124,145 +151,206 @@
     {
       "id": 1,
       "type": "ExecutionStarted",
-      "timestamp": "2026-11-26T12:00:00.000Z",
+      "timestamp": "2026-11-26T16:58:04.617Z",
+      "previousEventId": 0,
       "executionStartedEventDetails": {
-        "input": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\"}"
+        "input": "{\"fault\":\"timeout\"}",
+        "inputDetails": {
+          "truncated": false
+        },
+        "roleArn": "arn:aws:iam::000000000000:role/sfn-lens-demo-sfn"
       }
     },
     {
       "id": 2,
       "type": "TaskStateEntered",
-      "timestamp": "2026-11-26T12:00:00.100Z",
+      "timestamp": "2026-11-26T16:58:04.638Z",
+      "previousEventId": 0,
       "stateEnteredEventDetails": {
         "name": "Validate",
-        "input": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\"}"
+        "input": "{\"fault\":\"timeout\"}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 3,
-      "type": "TaskStateExited",
-      "timestamp": "2026-11-26T12:00:00.400Z",
-      "stateExitedEventDetails": {
-        "name": "Validate",
-        "output": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\",\"ok\":true}"
+      "type": "LambdaFunctionScheduled",
+      "timestamp": "2026-11-26T16:58:04.638Z",
+      "previousEventId": 2,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "input": "{\"step\":\"validate\",\"fault\":\"timeout\"}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 4,
-      "type": "ChoiceStateEntered",
-      "timestamp": "2026-11-26T12:00:00.450Z",
-      "stateEnteredEventDetails": {
-        "name": "Route",
-        "input": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\",\"ok\":true}"
-      }
+      "type": "LambdaFunctionStarted",
+      "timestamp": "2026-11-26T16:58:04.699Z",
+      "previousEventId": 3
     },
     {
       "id": 5,
-      "type": "ChoiceStateExited",
-      "timestamp": "2026-11-26T12:00:00.500Z",
-      "stateExitedEventDetails": {
-        "name": "Route",
-        "output": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\",\"ok\":true}"
+      "type": "LambdaFunctionSucceeded",
+      "timestamp": "2026-11-26T16:58:04.742Z",
+      "previousEventId": 4,
+      "lambdaFunctionSucceededEventDetails": {
+        "output": "{\"ok\": true, \"fault\": \"timeout\"}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 6,
-      "type": "ChoiceStateEntered",
-      "timestamp": "2026-11-26T12:00:00.550Z",
-      "stateEnteredEventDetails": {
-        "name": "MaybeMap",
-        "input": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\",\"ok\":true}"
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 5,
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"timeout\",\"validate\":{\"ok\":true,\"fault\":\"timeout\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 7,
-      "type": "ChoiceStateExited",
-      "timestamp": "2026-11-26T12:00:00.600Z",
-      "stateExitedEventDetails": {
-        "name": "MaybeMap",
-        "output": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\",\"ok\":true}"
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 6,
+      "stateEnteredEventDetails": {
+        "name": "Route",
+        "input": "{\"fault\":\"timeout\",\"validate\":{\"ok\":true,\"fault\":\"timeout\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 8,
-      "type": "TaskStateEntered",
-      "timestamp": "2026-11-26T12:00:00.650Z",
-      "stateEnteredEventDetails": {
-        "name": "Process",
-        "input": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\",\"ok\":true}"
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 7,
+      "stateExitedEventDetails": {
+        "name": "Route",
+        "output": "{\"fault\":\"timeout\",\"validate\":{\"ok\":true,\"fault\":\"timeout\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 9,
-      "type": "TaskTimedOut",
-      "timestamp": "2026-11-26T12:00:03.650Z",
-      "taskTimedOutEventDetails": {
-        "error": "States.Timeout",
-        "cause": "Task timed out after 3.00 seconds"
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 8,
+      "stateEnteredEventDetails": {
+        "name": "MaybeMap",
+        "input": "{\"fault\":\"timeout\",\"validate\":{\"ok\":true,\"fault\":\"timeout\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 10,
-      "type": "TaskStateExited",
-      "timestamp": "2026-11-26T12:00:03.700Z",
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 9,
       "stateExitedEventDetails": {
-        "name": "Process",
-        "output": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\",\"ok\":true,\"error\":{\"Error\":\"States.Timeout\"}}"
+        "name": "MaybeMap",
+        "output": "{\"fault\":\"timeout\",\"validate\":{\"ok\":true,\"fault\":\"timeout\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 11,
       "type": "ChoiceStateEntered",
-      "timestamp": "2026-11-26T12:00:03.750Z",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 10,
       "stateEnteredEventDetails": {
-        "name": "HandleError",
-        "input": "{\"fault\":\"timeout\",\"claimantEmail\":\"bob@example.com\",\"ok\":true,\"error\":{\"Error\":\"States.Timeout\"}}"
+        "name": "PickProcess",
+        "input": "{\"fault\":\"timeout\",\"validate\":{\"ok\":true,\"fault\":\"timeout\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 12,
       "type": "ChoiceStateExited",
-      "timestamp": "2026-11-26T12:00:03.800Z",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 11,
       "stateExitedEventDetails": {
-        "name": "HandleError"
+        "name": "PickProcess",
+        "output": "{\"fault\":\"timeout\",\"validate\":{\"ok\":true,\"fault\":\"timeout\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 13,
-      "type": "SucceedStateEntered",
-      "timestamp": "2026-11-26T12:00:03.850Z",
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 12,
       "stateEnteredEventDetails": {
-        "name": "Done"
+        "name": "ProcessFail",
+        "input": "{\"fault\":\"timeout\",\"validate\":{\"ok\":true,\"fault\":\"timeout\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 14,
-      "type": "SucceedStateExited",
-      "timestamp": "2026-11-26T12:00:03.900Z",
-      "stateExitedEventDetails": {
-        "name": "Done"
+      "type": "LambdaFunctionScheduled",
+      "timestamp": "2026-11-26T16:58:04.767Z",
+      "previousEventId": 13,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "input": "{\"step\":\"process\",\"fault\":\"timeout\"}",
+        "inputDetails": {
+          "truncated": false
+        },
+        "timeoutInSeconds": 4
       }
     },
     {
       "id": 15,
-      "type": "ExecutionSucceeded",
-      "timestamp": "2026-11-26T12:00:03.950Z"
+      "type": "LambdaFunctionStarted",
+      "timestamp": "2026-11-26T16:58:04.843Z",
+      "previousEventId": 14
+    },
+    {
+      "id": 16,
+      "type": "LambdaFunctionTimedOut",
+      "timestamp": "2026-11-26T16:58:08.843Z",
+      "previousEventId": 15,
+      "lambdaFunctionTimedOutEventDetails": {
+        "error": "States.Timeout"
+      }
+    },
+    {
+      "id": 17,
+      "type": "ExecutionFailed",
+      "timestamp": "2026-11-26T16:58:08.873Z",
+      "previousEventId": 16,
+      "executionFailedEventDetails": {
+        "error": "States.Timeout"
+      }
     }
   ],
-  "stateDetails": {
-    "Process": {
-      "input": {
-        "fault": "timeout",
-        "claimantEmail": "bob@example.com",
-        "ok": true
-      },
-      "error": "States.Timeout",
-      "cause": "Task timed out after 3.00 seconds"
-    }
-  },
   "gold": {
-    "failedState": "Process",
+    "failedState": "ProcessFail",
     "errorClass": "States.Timeout",
-    "rootCause": "timed out"
+    "rootCause": "States.Timeout"
   }
 }

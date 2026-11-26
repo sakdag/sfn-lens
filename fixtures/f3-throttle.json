@@ -1,122 +1,150 @@
 {
-  "source": "synthetic",
   "id": "f3-throttle",
-  "description": "Process throttles, retries, then Catch routes to Done",
+  "source": "recorded",
+  "description": "Recorded from f3-1795712284 (FAILED)",
   "faultId": "F3",
   "execution": {
-    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f3-throttle",
-    "name": "f3-throttle",
-    "status": "SUCCEEDED",
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f3-1795712284",
+    "name": "f3-1795712284",
+    "status": "FAILED",
     "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
-    "startDate": "2026-11-26T12:00:00.000Z",
-    "stopDate": "2026-11-26T12:00:01.750Z"
+    "startDate": "2026-11-26T16:58:05.327Z",
+    "stopDate": "2026-11-26T16:58:08.098Z",
+    "error": "Exception",
+    "cause": "{\"errorMessage\": \"Rate exceeded\", \"errorType\": \"Exception\", \"requestId\": \"d1cc7a98-8543-456b-a301-764f26f1061a\", \"stackTrace\": [\"  File \\\"/var/task/handler.py\\\", line 29, in handler\\n    raise Exception(\\\"Rate exceeded\\\")\\n\"]}",
+    "input": "{\"fault\":\"throttle\"}"
   },
   "definition": {
     "Comment": "sfn-lens demo — cheap fault-injection workflow",
     "StartAt": "Validate",
     "States": {
-      "Validate": {
-        "Type": "Task",
-        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-        "Parameters": {
-          "step": "validate",
-          "fault.$": "$.fault"
-        },
-        "Next": "Route"
+      "Done": {
+        "Type": "Succeed"
       },
-      "Route": {
-        "Type": "Choice",
-        "Choices": [
-          {
-            "Variable": "$.fault",
-            "StringEquals": "reject",
-            "Next": "Reject"
-          }
-        ],
-        "Default": "MaybeMap"
+      "FailAfterCatch": {
+        "Cause": "recovered from task error then failed deliberately",
+        "Error": "CaughtThenFailed",
+        "Type": "Fail"
       },
       "MaybeMap": {
-        "Type": "Choice",
         "Choices": [
           {
-            "Variable": "$.fault",
+            "Next": "ProcessMap",
             "StringEquals": "map_partial",
-            "Next": "ProcessMap"
+            "Variable": "$.fault"
           }
         ],
-        "Default": "Process"
+        "Default": "PickProcess",
+        "Type": "Choice"
       },
-      "ProcessMap": {
-        "Type": "Map",
-        "ItemsPath": "$.items",
-        "MaxConcurrency": 2,
-        "Iterator": {
-          "StartAt": "MapItem",
-          "States": {
-            "MapItem": {
-              "Type": "Task",
-              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-              "Parameters": {
-                "step": "map_item",
-                "item.$": "$"
-              },
-              "End": true
-            }
-          }
-        },
-        "Next": "Done"
-      },
-      "Process": {
-        "Type": "Task",
-        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-        "Parameters": {
-          "step": "process",
-          "fault.$": "$.fault"
-        },
-        "Retry": [
+      "PickProcess": {
+        "Choices": [
           {
-            "ErrorEquals": [
-              "States.ALL"
-            ],
-            "IntervalSeconds": 1,
-            "MaxAttempts": 2,
-            "BackoffRate": 1.5
+            "Next": "ProcessCatch",
+            "StringEquals": "caught_then_fail",
+            "Variable": "$.fault"
+          },
+          {
+            "Next": "ProcessThrottle",
+            "StringEquals": "throttle",
+            "Variable": "$.fault"
           }
         ],
+        "Default": "ProcessFail",
+        "Type": "Choice"
+      },
+      "ProcessCatch": {
         "Catch": [
           {
             "ErrorEquals": [
               "States.ALL"
             ],
-            "Next": "HandleError",
+            "Next": "FailAfterCatch",
             "ResultPath": "$.error"
           }
         ],
-        "Next": "Done"
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "Type": "Task"
       },
-      "HandleError": {
-        "Type": "Choice",
-        "Choices": [
+      "ProcessFail": {
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "TimeoutSeconds": 4,
+        "Type": "Task"
+      },
+      "ProcessMap": {
+        "ItemsPath": "$.items",
+        "Iterator": {
+          "StartAt": "MapItem",
+          "States": {
+            "MapItem": {
+              "End": true,
+              "Parameters": {
+                "item.$": "$",
+                "step": "map_item"
+              },
+              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+              "Type": "Task"
+            }
+          }
+        },
+        "MaxConcurrency": 2,
+        "Next": "Done",
+        "Type": "Map"
+      },
+      "ProcessThrottle": {
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "Retry": [
           {
-            "Variable": "$.fault",
-            "StringEquals": "caught_then_fail",
-            "Next": "FailAfterCatch"
+            "BackoffRate": 1.5,
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 2
           }
         ],
-        "Default": "Done"
-      },
-      "FailAfterCatch": {
-        "Type": "Fail",
-        "Error": "CaughtThenFailed",
-        "Cause": "recovered from task error then failed deliberately"
+        "Type": "Task"
       },
       "Reject": {
-        "Type": "Fail",
+        "Cause": "validation rejected",
         "Error": "Rejected",
-        "Cause": "validation rejected"
+        "Type": "Fail"
       },
-      "Done": {
-        "Type": "Succeed"
+      "Route": {
+        "Choices": [
+          {
+            "Next": "Reject",
+            "StringEquals": "reject",
+            "Variable": "$.fault"
+          }
+        ],
+        "Default": "MaybeMap",
+        "Type": "Choice"
+      },
+      "Validate": {
+        "Next": "Route",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "validate"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "ResultPath": "$.validate",
+        "Type": "Task"
       }
     }
   },
@@ -124,164 +152,265 @@
     {
       "id": 1,
       "type": "ExecutionStarted",
-      "timestamp": "2026-11-26T12:00:00.000Z",
+      "timestamp": "2026-11-26T16:58:05.327Z",
+      "previousEventId": 0,
       "executionStartedEventDetails": {
-        "input": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"}}"
+        "input": "{\"fault\":\"throttle\"}",
+        "inputDetails": {
+          "truncated": false
+        },
+        "roleArn": "arn:aws:iam::000000000000:role/sfn-lens-demo-sfn"
       }
     },
     {
       "id": 2,
       "type": "TaskStateEntered",
-      "timestamp": "2026-11-26T12:00:00.100Z",
+      "timestamp": "2026-11-26T16:58:05.350Z",
+      "previousEventId": 0,
       "stateEnteredEventDetails": {
         "name": "Validate",
-        "input": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"}}"
+        "input": "{\"fault\":\"throttle\"}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 3,
-      "type": "TaskStateExited",
-      "timestamp": "2026-11-26T12:00:00.400Z",
-      "stateExitedEventDetails": {
-        "name": "Validate",
-        "output": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"},\"ok\":true}"
+      "type": "LambdaFunctionScheduled",
+      "timestamp": "2026-11-26T16:58:05.350Z",
+      "previousEventId": 2,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "input": "{\"step\":\"validate\",\"fault\":\"throttle\"}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 4,
-      "type": "ChoiceStateEntered",
-      "timestamp": "2026-11-26T12:00:00.450Z",
-      "stateEnteredEventDetails": {
-        "name": "Route",
-        "input": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"},\"ok\":true}"
-      }
+      "type": "LambdaFunctionStarted",
+      "timestamp": "2026-11-26T16:58:05.412Z",
+      "previousEventId": 3
     },
     {
       "id": 5,
-      "type": "ChoiceStateExited",
-      "timestamp": "2026-11-26T12:00:00.500Z",
-      "stateExitedEventDetails": {
-        "name": "Route",
-        "output": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"},\"ok\":true}"
+      "type": "LambdaFunctionSucceeded",
+      "timestamp": "2026-11-26T16:58:05.638Z",
+      "previousEventId": 4,
+      "lambdaFunctionSucceededEventDetails": {
+        "output": "{\"ok\": true, \"fault\": \"throttle\"}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 6,
-      "type": "ChoiceStateEntered",
-      "timestamp": "2026-11-26T12:00:00.550Z",
-      "stateEnteredEventDetails": {
-        "name": "MaybeMap",
-        "input": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"},\"ok\":true}"
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 5,
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"throttle\",\"validate\":{\"ok\":true,\"fault\":\"throttle\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 7,
-      "type": "ChoiceStateExited",
-      "timestamp": "2026-11-26T12:00:00.600Z",
-      "stateExitedEventDetails": {
-        "name": "MaybeMap",
-        "output": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"},\"ok\":true}"
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 6,
+      "stateEnteredEventDetails": {
+        "name": "Route",
+        "input": "{\"fault\":\"throttle\",\"validate\":{\"ok\":true,\"fault\":\"throttle\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 8,
-      "type": "TaskStateEntered",
-      "timestamp": "2026-11-26T12:00:00.650Z",
-      "stateEnteredEventDetails": {
-        "name": "Process",
-        "input": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"},\"ok\":true}"
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 7,
+      "stateExitedEventDetails": {
+        "name": "Route",
+        "output": "{\"fault\":\"throttle\",\"validate\":{\"ok\":true,\"fault\":\"throttle\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 9,
-      "type": "TaskFailed",
-      "timestamp": "2026-11-26T12:00:00.800Z",
-      "taskFailedEventDetails": {
-        "error": "States.TaskFailed",
-        "cause": "{\"errorMessage\":\"Rate exceeded\",\"claimantEmail\":\"throttle@example.com\"}"
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 8,
+      "stateEnteredEventDetails": {
+        "name": "MaybeMap",
+        "input": "{\"fault\":\"throttle\",\"validate\":{\"ok\":true,\"fault\":\"throttle\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 10,
-      "type": "TaskFailed",
-      "timestamp": "2026-11-26T12:00:01.000Z",
-      "taskFailedEventDetails": {
-        "error": "States.TaskFailed",
-        "cause": "{\"errorMessage\":\"Rate exceeded\",\"claimantEmail\":\"throttle@example.com\"}"
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 9,
+      "stateExitedEventDetails": {
+        "name": "MaybeMap",
+        "output": "{\"fault\":\"throttle\",\"validate\":{\"ok\":true,\"fault\":\"throttle\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 11,
-      "type": "TaskFailed",
-      "timestamp": "2026-11-26T12:00:01.200Z",
-      "taskFailedEventDetails": {
-        "error": "States.TaskFailed",
-        "cause": "{\"errorMessage\":\"Rate exceeded\",\"claimantEmail\":\"throttle@example.com\"}"
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 10,
+      "stateEnteredEventDetails": {
+        "name": "PickProcess",
+        "input": "{\"fault\":\"throttle\",\"validate\":{\"ok\":true,\"fault\":\"throttle\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 12,
-      "type": "TaskStateExited",
-      "timestamp": "2026-11-26T12:00:01.500Z",
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 11,
       "stateExitedEventDetails": {
-        "name": "Process",
-        "output": "{\"fault\":\"throttle\",\"customer\":{\"ssn\":\"123-45-6789\"},\"ok\":true,\"error\":{\"Error\":\"States.TaskFailed\"}}"
+        "name": "PickProcess",
+        "output": "{\"fault\":\"throttle\",\"validate\":{\"ok\":true,\"fault\":\"throttle\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 13,
-      "type": "ChoiceStateEntered",
-      "timestamp": "2026-11-26T12:00:01.550Z",
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 12,
       "stateEnteredEventDetails": {
-        "name": "HandleError"
+        "name": "ProcessThrottle",
+        "input": "{\"fault\":\"throttle\",\"validate\":{\"ok\":true,\"fault\":\"throttle\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 14,
-      "type": "ChoiceStateExited",
-      "timestamp": "2026-11-26T12:00:01.600Z",
-      "stateExitedEventDetails": {
-        "name": "HandleError"
+      "type": "LambdaFunctionScheduled",
+      "timestamp": "2026-11-26T16:58:05.652Z",
+      "previousEventId": 13,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "input": "{\"step\":\"process\",\"fault\":\"throttle\"}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 15,
-      "type": "SucceedStateEntered",
-      "timestamp": "2026-11-26T12:00:01.650Z",
-      "stateEnteredEventDetails": {
-        "name": "Done"
-      }
+      "type": "LambdaFunctionStarted",
+      "timestamp": "2026-11-26T16:58:05.724Z",
+      "previousEventId": 14
     },
     {
       "id": 16,
-      "type": "SucceedStateExited",
-      "timestamp": "2026-11-26T12:00:01.700Z",
-      "stateExitedEventDetails": {
-        "name": "Done"
+      "type": "LambdaFunctionFailed",
+      "timestamp": "2026-11-26T16:58:05.765Z",
+      "previousEventId": 15,
+      "lambdaFunctionFailedEventDetails": {
+        "error": "Exception",
+        "cause": "{\"errorMessage\": \"Rate exceeded\", \"errorType\": \"Exception\", \"requestId\": \"6f46b114-481b-4912-9073-cd96e4b8f5cd\", \"stackTrace\": [\"  File \\\"/var/task/handler.py\\\", line 29, in handler\\n    raise Exception(\\\"Rate exceeded\\\")\\n\"]}"
       }
     },
     {
       "id": 17,
-      "type": "ExecutionSucceeded",
-      "timestamp": "2026-11-26T12:00:01.750Z"
+      "type": "LambdaFunctionScheduled",
+      "timestamp": "2026-11-26T16:58:06.846Z",
+      "previousEventId": 16,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "input": "{\"step\":\"process\",\"fault\":\"throttle\"}",
+        "inputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "LambdaFunctionStarted",
+      "timestamp": "2026-11-26T16:58:06.896Z",
+      "previousEventId": 17
+    },
+    {
+      "id": 19,
+      "type": "LambdaFunctionFailed",
+      "timestamp": "2026-11-26T16:58:06.929Z",
+      "previousEventId": 18,
+      "lambdaFunctionFailedEventDetails": {
+        "error": "Exception",
+        "cause": "{\"errorMessage\": \"Rate exceeded\", \"errorType\": \"Exception\", \"requestId\": \"4e4cb64e-0197-453e-8681-5548b1e6b58f\", \"stackTrace\": [\"  File \\\"/var/task/handler.py\\\", line 29, in handler\\n    raise Exception(\\\"Rate exceeded\\\")\\n\"]}"
+      }
+    },
+    {
+      "id": 20,
+      "type": "LambdaFunctionScheduled",
+      "timestamp": "2026-11-26T16:58:08.001Z",
+      "previousEventId": 19,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "input": "{\"step\":\"process\",\"fault\":\"throttle\"}",
+        "inputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "LambdaFunctionStarted",
+      "timestamp": "2026-11-26T16:58:08.034Z",
+      "previousEventId": 20
+    },
+    {
+      "id": 22,
+      "type": "LambdaFunctionFailed",
+      "timestamp": "2026-11-26T16:58:08.062Z",
+      "previousEventId": 21,
+      "lambdaFunctionFailedEventDetails": {
+        "error": "Exception",
+        "cause": "{\"errorMessage\": \"Rate exceeded\", \"errorType\": \"Exception\", \"requestId\": \"d1cc7a98-8543-456b-a301-764f26f1061a\", \"stackTrace\": [\"  File \\\"/var/task/handler.py\\\", line 29, in handler\\n    raise Exception(\\\"Rate exceeded\\\")\\n\"]}"
+      }
+    },
+    {
+      "id": 23,
+      "type": "ExecutionFailed",
+      "timestamp": "2026-11-26T16:58:08.098Z",
+      "previousEventId": 22,
+      "executionFailedEventDetails": {
+        "error": "Exception",
+        "cause": "{\"errorMessage\": \"Rate exceeded\", \"errorType\": \"Exception\", \"requestId\": \"d1cc7a98-8543-456b-a301-764f26f1061a\", \"stackTrace\": [\"  File \\\"/var/task/handler.py\\\", line 29, in handler\\n    raise Exception(\\\"Rate exceeded\\\")\\n\"]}"
+      }
     }
   ],
-  "stateDetails": {
-    "Process": {
-      "input": {
-        "fault": "throttle",
-        "customer": {
-          "ssn": "123-45-6789"
-        },
-        "ok": true
-      },
-      "error": "States.TaskFailed",
-      "cause": "{\"errorMessage\":\"Rate exceeded\",\"claimantEmail\":\"throttle@example.com\"}"
-    }
-  },
   "gold": {
-    "failedState": "Process",
-    "errorClass": "States.TaskFailed",
+    "failedState": "ProcessThrottle",
+    "errorClass": "Exception",
     "rootCause": "Rate exceeded"
   }
 }

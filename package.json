@@ -20,6 +20,7 @@
     "start:stdio": "npm run start:stdio -w @sfn-lens/server",
     "typecheck": "npm run typecheck -w @sfn-lens/core && npm run typecheck -w @sfn-lens/server && npm run typecheck -w @sfn-lens/view",
     "fixtures:generate": "node scripts/generate-fixtures.mjs",
+    "fixtures:record": "node scripts/record-fixtures.mjs",
     "eval": "npm run build:core && python3 eval/diagnose.py",
     "eval:dry": "npm run build:core && python3 eval/diagnose.py --dry-run"
   },

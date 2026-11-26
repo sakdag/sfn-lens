@@ -1,6 +1,6 @@
 # Eval harness
 
-Compares failed-state diagnosis when the model sees the real `ExecutionSummary` (from `@sfn-lens/core`) vs truncated raw `GetExecutionHistory`, on **synthetic** fixtures.
+Compares failed-state diagnosis when the model sees the real `ExecutionSummary` (from `@sfn-lens/core`) vs truncated raw `GetExecutionHistory`, on **recorded** demo fixtures (plus one synthetic large Map).
 
 ```bash
 npm run build:core

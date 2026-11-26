@@ -1,47 +1,149 @@
 {
   "id": "ok-success",
-  "description": "Happy-path execution that reaches Done",
+  "source": "recorded",
+  "description": "Recorded from ok-1795712287 (SUCCEEDED)",
   "faultId": "OK",
   "execution": {
-    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:ok-success",
-    "name": "ok-success",
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:ok-1795712287",
+    "name": "ok-1795712287",
     "status": "SUCCEEDED",
     "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
-    "startDate": "2026-11-26T09:00:00.000Z",
-    "stopDate": "2026-11-26T09:00:01.500Z"
+    "startDate": "2026-11-26T16:58:08.184Z",
+    "stopDate": "2026-11-26T16:58:08.502Z",
+    "input": "{\"fault\":\"none\"}",
+    "output": "{\"ok\": true, \"fault\": \"none\", \"processed\": true}"
   },
   "definition": {
-    "Comment": "sfn-lens demo workflow",
+    "Comment": "sfn-lens demo — cheap fault-injection workflow",
     "StartAt": "Validate",
     "States": {
-      "Validate": {
-        "Type": "Task",
-        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-        "Next": "Route"
-      },
-      "Route": {
-        "Type": "Choice",
-        "Choices": [
-          {
-            "Variable": "$.fault",
-            "StringEquals": "reject",
-            "Next": "Reject"
-          }
-        ],
-        "Default": "Process"
-      },
-      "Process": {
-        "Type": "Task",
-        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
-        "Next": "Done"
-      },
-      "Reject": {
-        "Type": "Fail",
-        "Error": "Rejected",
-        "Cause": "validation rejected"
-      },
       "Done": {
         "Type": "Succeed"
+      },
+      "FailAfterCatch": {
+        "Cause": "recovered from task error then failed deliberately",
+        "Error": "CaughtThenFailed",
+        "Type": "Fail"
+      },
+      "MaybeMap": {
+        "Choices": [
+          {
+            "Next": "ProcessMap",
+            "StringEquals": "map_partial",
+            "Variable": "$.fault"
+          }
+        ],
+        "Default": "PickProcess",
+        "Type": "Choice"
+      },
+      "PickProcess": {
+        "Choices": [
+          {
+            "Next": "ProcessCatch",
+            "StringEquals": "caught_then_fail",
+            "Variable": "$.fault"
+          },
+          {
+            "Next": "ProcessThrottle",
+            "StringEquals": "throttle",
+            "Variable": "$.fault"
+          }
+        ],
+        "Default": "ProcessFail",
+        "Type": "Choice"
+      },
+      "ProcessCatch": {
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "Next": "FailAfterCatch",
+            "ResultPath": "$.error"
+          }
+        ],
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "Type": "Task"
+      },
+      "ProcessFail": {
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "TimeoutSeconds": 4,
+        "Type": "Task"
+      },
+      "ProcessMap": {
+        "ItemsPath": "$.items",
+        "Iterator": {
+          "StartAt": "MapItem",
+          "States": {
+            "MapItem": {
+              "End": true,
+              "Parameters": {
+                "item.$": "$",
+                "step": "map_item"
+              },
+              "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+              "Type": "Task"
+            }
+          }
+        },
+        "MaxConcurrency": 2,
+        "Next": "Done",
+        "Type": "Map"
+      },
+      "ProcessThrottle": {
+        "Next": "Done",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "process"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "Retry": [
+          {
+            "BackoffRate": 1.5,
+            "ErrorEquals": [
+              "States.ALL"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 2
+          }
+        ],
+        "Type": "Task"
+      },
+      "Reject": {
+        "Cause": "validation rejected",
+        "Error": "Rejected",
+        "Type": "Fail"
+      },
+      "Route": {
+        "Choices": [
+          {
+            "Next": "Reject",
+            "StringEquals": "reject",
+            "Variable": "$.fault"
+          }
+        ],
+        "Default": "MaybeMap",
+        "Type": "Choice"
+      },
+      "Validate": {
+        "Next": "Route",
+        "Parameters": {
+          "fault.$": "$.fault",
+          "step": "validate"
+        },
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "ResultPath": "$.validate",
+        "Type": "Task"
       }
     }
   },
@@ -49,86 +151,246 @@
     {
       "id": 1,
       "type": "ExecutionStarted",
-      "timestamp": "2026-11-26T09:00:00.000Z"
+      "timestamp": "2026-11-26T16:58:08.184Z",
+      "previousEventId": 0,
+      "executionStartedEventDetails": {
+        "input": "{\"fault\":\"none\"}",
+        "inputDetails": {
+          "truncated": false
+        },
+        "roleArn": "arn:aws:iam::000000000000:role/sfn-lens-demo-sfn"
+      }
     },
     {
       "id": 2,
       "type": "TaskStateEntered",
-      "timestamp": "2026-11-26T09:00:00.100Z",
+      "timestamp": "2026-11-26T16:58:08.204Z",
+      "previousEventId": 0,
       "stateEnteredEventDetails": {
         "name": "Validate",
-        "input": "{\"fault\":\"none\"}"
+        "input": "{\"fault\":\"none\"}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 3,
-      "type": "TaskStateExited",
-      "timestamp": "2026-11-26T09:00:00.400Z",
-      "stateExitedEventDetails": {
-        "name": "Validate",
-        "output": "{\"fault\":\"none\",\"ok\":true}"
+      "type": "LambdaFunctionScheduled",
+      "timestamp": "2026-11-26T16:58:08.204Z",
+      "previousEventId": 2,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "input": "{\"step\":\"validate\",\"fault\":\"none\"}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 4,
-      "type": "ChoiceStateEntered",
-      "timestamp": "2026-11-26T09:00:00.450Z",
-      "stateEnteredEventDetails": {
-        "name": "Route"
-      }
+      "type": "LambdaFunctionStarted",
+      "timestamp": "2026-11-26T16:58:08.231Z",
+      "previousEventId": 3
     },
     {
       "id": 5,
-      "type": "ChoiceStateExited",
-      "timestamp": "2026-11-26T09:00:00.500Z",
-      "stateExitedEventDetails": {
-        "name": "Route"
+      "type": "LambdaFunctionSucceeded",
+      "timestamp": "2026-11-26T16:58:08.268Z",
+      "previousEventId": 4,
+      "lambdaFunctionSucceededEventDetails": {
+        "output": "{\"ok\": true, \"fault\": \"none\"}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 6,
-      "type": "TaskStateEntered",
-      "timestamp": "2026-11-26T09:00:00.550Z",
-      "stateEnteredEventDetails": {
-        "name": "Process",
-        "input": "{\"fault\":\"none\",\"ok\":true}"
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 5,
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"none\",\"validate\":{\"ok\":true,\"fault\":\"none\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 7,
-      "type": "TaskStateExited",
-      "timestamp": "2026-11-26T09:00:01.200Z",
-      "stateExitedEventDetails": {
-        "name": "Process",
-        "output": "{\"ok\":true,\"processed\":true}"
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 6,
+      "stateEnteredEventDetails": {
+        "name": "Route",
+        "input": "{\"fault\":\"none\",\"validate\":{\"ok\":true,\"fault\":\"none\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 8,
-      "type": "SucceedStateEntered",
-      "timestamp": "2026-11-26T09:00:01.300Z",
-      "stateEnteredEventDetails": {
-        "name": "Done"
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 7,
+      "stateExitedEventDetails": {
+        "name": "Route",
+        "output": "{\"fault\":\"none\",\"validate\":{\"ok\":true,\"fault\":\"none\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 9,
-      "type": "SucceedStateExited",
-      "timestamp": "2026-11-26T09:00:01.400Z",
-      "stateExitedEventDetails": {
-        "name": "Done"
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 8,
+      "stateEnteredEventDetails": {
+        "name": "MaybeMap",
+        "input": "{\"fault\":\"none\",\"validate\":{\"ok\":true,\"fault\":\"none\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
       }
     },
     {
       "id": 10,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 9,
+      "stateExitedEventDetails": {
+        "name": "MaybeMap",
+        "output": "{\"fault\":\"none\",\"validate\":{\"ok\":true,\"fault\":\"none\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 10,
+      "stateEnteredEventDetails": {
+        "name": "PickProcess",
+        "input": "{\"fault\":\"none\",\"validate\":{\"ok\":true,\"fault\":\"none\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 11,
+      "stateExitedEventDetails": {
+        "name": "PickProcess",
+        "output": "{\"fault\":\"none\",\"validate\":{\"ok\":true,\"fault\":\"none\"}}",
+        "outputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 12,
+      "stateEnteredEventDetails": {
+        "name": "ProcessFail",
+        "input": "{\"fault\":\"none\",\"validate\":{\"ok\":true,\"fault\":\"none\"}}",
+        "inputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "LambdaFunctionScheduled",
+      "timestamp": "2026-11-26T16:58:08.331Z",
+      "previousEventId": 13,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo-fn",
+        "input": "{\"step\":\"process\",\"fault\":\"none\"}",
+        "inputDetails": {
+          "truncated": false
+        },
+        "timeoutInSeconds": 4
+      }
+    },
+    {
+      "id": 15,
+      "type": "LambdaFunctionStarted",
+      "timestamp": "2026-11-26T16:58:08.370Z",
+      "previousEventId": 14
+    },
+    {
+      "id": 16,
+      "type": "LambdaFunctionSucceeded",
+      "timestamp": "2026-11-26T16:58:08.454Z",
+      "previousEventId": 15,
+      "lambdaFunctionSucceededEventDetails": {
+        "output": "{\"ok\": true, \"fault\": \"none\", \"processed\": true}",
+        "outputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T16:58:08.472Z",
+      "previousEventId": 16,
+      "stateExitedEventDetails": {
+        "name": "ProcessFail",
+        "output": "{\"ok\": true, \"fault\": \"none\", \"processed\": true}",
+        "outputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "SucceedStateEntered",
+      "timestamp": "2026-11-26T16:58:08.472Z",
+      "previousEventId": 17,
+      "stateEnteredEventDetails": {
+        "name": "Done",
+        "input": "{\"ok\": true, \"fault\": \"none\", \"processed\": true}",
+        "inputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "SucceedStateExited",
+      "timestamp": "2026-11-26T16:58:08.472Z",
+      "previousEventId": 18,
+      "stateExitedEventDetails": {
+        "name": "Done",
+        "output": "{\"ok\": true, \"fault\": \"none\", \"processed\": true}",
+        "outputDetails": {
+          "truncated": false
+        }
+      }
+    },
+    {
+      "id": 20,
       "type": "ExecutionSucceeded",
-      "timestamp": "2026-11-26T09:00:01.500Z"
+      "timestamp": "2026-11-26T16:58:08.502Z",
+      "previousEventId": 19,
+      "executionSucceededEventDetails": {
+        "output": "{\"ok\": true, \"fault\": \"none\", \"processed\": true}",
+        "outputDetails": {
+          "truncated": false
+        }
+      }
     }
-  ],
-  "gold": {
-    "failedState": null,
-    "errorClass": null,
-    "rootCause": null
-  },
-  "source": "synthetic"
+  ]
 }

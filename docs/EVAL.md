@@ -5,10 +5,10 @@ Goal: measure whether the **compact execution summary** helps a model identify t
 ## Setup
 
 - Model: Amazon Bedrock `eu.amazon.nova-micro-v1:0` (keep total spend under ~$1).
-- Fixtures: synthetic `fixtures/*.json` (see [`fixtures/README.md`](../fixtures/README.md)) with gold labels for scoring only — gold is never shown to the model.
+- Fixtures: mostly **recorded** from the live demo (`source: "recorded"`), plus one synthetic large Map (`f4-map-large`). Gold labels are for scoring only — never shown to the model.
 - Conditions:
   - **A — summary:** model sees `ExecutionSummary` JSON only (from `@sfn-lens/core`)
-  - **B — raw:** model sees truncated `GetExecutionHistory` events (cap ~12k chars)
+  - **B — raw:** model sees truncated `GetExecutionHistory` events
 
 ## Metrics
 
@@ -28,13 +28,13 @@ npm run eval -- --limit 7 # Bedrock Nova Micro (default AWS credentials)
 
 Results: `eval/results/latest.json`. See [`eval/README.md`](../eval/README.md).
 
-## Latest run (Nova Micro, 7 synthetic fixtures)
+## Latest run (Nova Micro, 6 recorded + 1 synthetic large Map)
 
-**Headline:** summary got the failed state **7/7** vs raw **6/7**, at **2,959** vs **12,043** input tokens (~4× fewer).
+**Headline:** summary got the failed state **7/7** vs raw **5/7**, at **3,443** vs **17,623** input tokens (~5× fewer).
 
 | Condition | Failed-state | Input tokens |
 | --- | --- | --- |
-| Summary (`ExecutionSummary`) | 7/7 | 2,959 |
-| Raw history (truncated) | 6/7 | 12,043 |
+| Summary (`ExecutionSummary`) | 7/7 | 3,443 |
+| Raw history (truncated) | 5/7 | 17,623 |
 
-Cost ≈ $0.0006. With seven fixtures, secondary gaps are often a single case — e.g. on `f4-map-partial`, raw matched the error class and summary did not. Large Map fixture (`f4-map-large`, 331 events): summary ~1.6KB vs raw ~61KB.
+Cost ≈ $0.0008. With seven fixtures, secondary gaps are often a single case. Large Map fixture (`f4-map-large`, 331 events): summary stays compact while raw history dominates token count.

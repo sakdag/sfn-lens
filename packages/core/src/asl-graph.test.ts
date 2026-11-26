@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { aslToGraph } from "./asl-graph.js";
 import { overlayFromHistory } from "./history-overlay.js";
+import { layoutGraph } from "./layout.js";
 import { buildViewModel } from "./summary.js";
 import { pathPatternToRegExp, redactErrorCause, redactValue } from "./redaction.js";
 import { compareOverlays } from "./compare.js";
@@ -41,6 +42,36 @@ describe("aslToGraph", () => {
     assert.ok(g.edges.some((e) => e.kind === "choice"));
     assert.ok(g.edges.some((e) => e.kind === "catch"));
     assert.ok(g.edges.some((e) => e.kind === "default"));
+  });
+});
+
+describe("layout", () => {
+  it("places Map iterator children beside the Map, not over Done", () => {
+    const def: AslDefinition = {
+      StartAt: "ProcessMap",
+      States: {
+        ProcessMap: {
+          Type: "Map",
+          ItemsPath: "$.items",
+          Iterator: {
+            StartAt: "MapItem",
+            States: { MapItem: { Type: "Pass", End: true } },
+          },
+          Next: "Done",
+        },
+        Done: { Type: "Succeed" },
+      },
+    };
+    const laid = layoutGraph(aslToGraph(def));
+    const map = laid.nodes.find((n) => n.name === "ProcessMap")!;
+    const item = laid.nodes.find((n) => n.name === "MapItem")!;
+    const done = laid.nodes.find((n) => n.name === "Done")!;
+    assert.ok(item.x >= map.x + map.width, "MapItem should sit to the right of ProcessMap");
+    const overlapX =
+      item.x < done.x + done.width && item.x + item.width > done.x;
+    const overlapY =
+      item.y < done.y + done.height && item.y + item.height > done.y;
+    assert.equal(overlapX && overlapY, false, "MapItem must not overlap Done");
   });
 });
 

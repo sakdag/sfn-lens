@@ -48,7 +48,7 @@ resource "aws_lambda_function" "demo" {
   runtime          = "python3.12"
   filename         = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256
-  timeout          = 3
+  timeout          = 15
   memory_size      = 128
 }
 
@@ -79,6 +79,14 @@ resource "aws_iam_role_policy" "sfn_lambda" {
 }
 
 locals {
+  # Fault routing (see demo/scripts/inject_faults.sh):
+  #   reject            → Reject (Fail)
+  #   map_partial       → ProcessMap (Map item failure)
+  #   lambda_error      → ProcessFail (uncaught TaskFailed)
+  #   timeout           → ProcessFail (States.Timeout via TimeoutSeconds)
+  #   throttle          → ProcessThrottle (retries then FAIL)
+  #   caught_then_fail  → ProcessCatch → FailAfterCatch
+  #   none              → ProcessFail → Done
   definition = {
     Comment = "sfn-lens demo — cheap fault-injection workflow"
     StartAt = "Validate"
@@ -87,10 +95,13 @@ locals {
         Type     = "Task"
         Resource = aws_lambda_function.demo.arn
         Parameters = {
-          step     = "validate"
+          step      = "validate"
           "fault.$" = "$.fault"
         }
-        Next = "Route"
+        # Keep $.fault / $.items — without this, Validate output replaces the input
+        # and Map ItemsPath $.items fails with States.ReferencePathConflict.
+        ResultPath = "$.validate"
+        Next       = "Route"
       }
       Route = {
         Type = "Choice"
@@ -108,7 +119,23 @@ locals {
           StringEquals = "map_partial"
           Next         = "ProcessMap"
         }]
-        Default = "Process"
+        Default = "PickProcess"
+      }
+      PickProcess = {
+        Type = "Choice"
+        Choices = [
+          {
+            Variable     = "$.fault"
+            StringEquals = "caught_then_fail"
+            Next         = "ProcessCatch"
+          },
+          {
+            Variable     = "$.fault"
+            StringEquals = "throttle"
+            Next         = "ProcessThrottle"
+          }
+        ]
+        Default = "ProcessFail"
       }
       ProcessMap = {
         Type           = "Map"
@@ -121,8 +148,8 @@ locals {
               Type     = "Task"
               Resource = aws_lambda_function.demo.arn
               Parameters = {
-                step      = "map_item"
-                "item.$"  = "$"
+                step     = "map_item"
+                "item.$" = "$"
               }
               End = true
             }
@@ -130,7 +157,19 @@ locals {
         }
         Next = "Done"
       }
-      Process = {
+      # lambda_error / timeout / happy path — no Catch
+      ProcessFail = {
+        Type           = "Task"
+        Resource       = aws_lambda_function.demo.arn
+        TimeoutSeconds = 4
+        Parameters = {
+          step      = "process"
+          "fault.$" = "$.fault"
+        }
+        Next = "Done"
+      }
+      # throttle — retry then fail (no Catch to Succeed)
+      ProcessThrottle = {
         Type     = "Task"
         Resource = aws_lambda_function.demo.arn
         Parameters = {
@@ -143,21 +182,22 @@ locals {
           MaxAttempts     = 2
           BackoffRate     = 1.5
         }]
+        Next = "Done"
+      }
+      # caught_then_fail — Catch then deliberate Fail
+      ProcessCatch = {
+        Type     = "Task"
+        Resource = aws_lambda_function.demo.arn
+        Parameters = {
+          step      = "process"
+          "fault.$" = "$.fault"
+        }
         Catch = [{
           ErrorEquals = ["States.ALL"]
-          Next        = "HandleError"
+          Next        = "FailAfterCatch"
           ResultPath  = "$.error"
         }]
         Next = "Done"
-      }
-      HandleError = {
-        Type = "Choice"
-        Choices = [{
-          Variable     = "$.fault"
-          StringEquals = "caught_then_fail"
-          Next         = "FailAfterCatch"
-        }]
-        Default = "Done"
       }
       FailAfterCatch = {
         Type  = "Fail"

@@ -5,13 +5,13 @@
       "fixture": "f1-lambda-error",
       "condition": "summary",
       "pred": {
-        "failedState": "Process",
-        "errorClass": "States.TaskFailed",
+        "failedState": "ProcessFail",
+        "errorClass": "RuntimeError",
         "rootCause": "injected lambda failure"
       },
       "gold": {
-        "failedState": "Process",
-        "errorClass": "States.TaskFailed",
+        "failedState": "ProcessFail",
+        "errorClass": "RuntimeError",
         "rootCause": "injected lambda failure"
       },
       "score": {
@@ -19,125 +19,125 @@
         "error_class_ok": true,
         "root_cause_ok": true
       },
-      "inputTokens": 277,
-      "outputTokens": 34
+      "inputTokens": 538,
+      "outputTokens": 33
     },
     {
       "fixture": "f1-lambda-error",
       "condition": "raw",
       "pred": {
-        "failedState": "Process",
+        "failedState": "ProcessFail",
         "errorClass": "RuntimeError",
         "rootCause": "injected lambda failure"
       },
       "gold": {
-        "failedState": "Process",
-        "errorClass": "States.TaskFailed",
+        "failedState": "ProcessFail",
+        "errorClass": "RuntimeError",
         "rootCause": "injected lambda failure"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 1852,
+      "outputTokens": 33
+    },
+    {
+      "fixture": "f2-timeout",
+      "condition": "summary",
+      "pred": {
+        "failedState": "ProcessFail",
+        "errorClass": "Timeout",
+        "rootCause": "States.Timeout"
+      },
+      "gold": {
+        "failedState": "ProcessFail",
+        "errorClass": "States.Timeout",
+        "rootCause": "States.Timeout"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 442,
+      "outputTokens": 30
+    },
+    {
+      "fixture": "f2-timeout",
+      "condition": "raw",
+      "pred": {
+        "failedState": "LambdaFunctionTimedOut",
+        "errorClass": "Timeout",
+        "rootCause": "The Lambda function execution timed out."
+      },
+      "gold": {
+        "failedState": "ProcessFail",
+        "errorClass": "States.Timeout",
+        "rootCause": "States.Timeout"
+      },
+      "score": {
+        "failed_state_ok": false,
+        "error_class_ok": true,
+        "root_cause_ok": false
+      },
+      "inputTokens": 1596,
+      "outputTokens": 37
+    },
+    {
+      "fixture": "f3-throttle",
+      "condition": "summary",
+      "pred": {
+        "failedState": "ProcessThrottle",
+        "errorClass": "Exception",
+        "rootCause": "Rate exceeded"
+      },
+      "gold": {
+        "failedState": "ProcessThrottle",
+        "errorClass": "Exception",
+        "rootCause": "Rate exceeded"
+      },
+      "score": {
+        "failed_state_ok": true,
+        "error_class_ok": true,
+        "root_cause_ok": true
+      },
+      "inputTokens": 527,
+      "outputTokens": 29
+    },
+    {
+      "fixture": "f3-throttle",
+      "condition": "raw",
+      "pred": {
+        "failedState": "ProcessThrottle",
+        "errorClass": "Execution",
+        "rootCause": "Rate exceeded"
+      },
+      "gold": {
+        "failedState": "ProcessThrottle",
+        "errorClass": "Exception",
+        "rootCause": "Rate exceeded"
       },
       "score": {
         "failed_state_ok": true,
         "error_class_ok": false,
         "root_cause_ok": true
       },
-      "inputTokens": 607,
-      "outputTokens": 32
-    },
-    {
-      "fixture": "f2-timeout",
-      "condition": "summary",
-      "pred": {
-        "failedState": "Process",
-        "errorClass": "States.Timeout",
-        "rootCause": "Task timed out after 3.00 seconds"
-      },
-      "gold": {
-        "failedState": "Process",
-        "errorClass": "States.Timeout",
-        "rootCause": "timed out"
-      },
-      "score": {
-        "failed_state_ok": true,
-        "error_class_ok": true,
-        "root_cause_ok": true
-      },
-      "inputTokens": 455,
-      "outputTokens": 38
-    },
-    {
-      "fixture": "f2-timeout",
-      "condition": "raw",
-      "pred": {
-        "failedState": "Process",
-        "errorClass": "Timeout",
-        "rootCause": "Task timed out after 3.00 seconds"
-      },
-      "gold": {
-        "failedState": "Process",
-        "errorClass": "States.Timeout",
-        "rootCause": "timed out"
-      },
-      "score": {
-        "failed_state_ok": true,
-        "error_class_ok": true,
-        "root_cause_ok": true
-      },
-      "inputTokens": 1157,
-      "outputTokens": 36
-    },
-    {
-      "fixture": "f3-throttle",
-      "condition": "summary",
-      "pred": {
-        "failedState": "Process",
-        "errorClass": "States.TaskFailed",
-        "rootCause": "Rate exceeded"
-      },
-      "gold": {
-        "failedState": "Process",
-        "errorClass": "States.TaskFailed",
-        "rootCause": "Rate exceeded"
-      },
-      "score": {
-        "failed_state_ok": true,
-        "error_class_ok": true,
-        "root_cause_ok": true
-      },
-      "inputTokens": 461,
-      "outputTokens": 31
-    },
-    {
-      "fixture": "f3-throttle",
-      "condition": "raw",
-      "pred": {
-        "failedState": "Process",
-        "errorClass": "States.TaskFailed",
-        "rootCause": "Rate exceeded"
-      },
-      "gold": {
-        "failedState": "Process",
-        "errorClass": "States.TaskFailed",
-        "rootCause": "Rate exceeded"
-      },
-      "score": {
-        "failed_state_ok": true,
-        "error_class_ok": true,
-        "root_cause_ok": true
-      },
-      "inputTokens": 1375,
-      "outputTokens": 31
+      "inputTokens": 2472,
+      "outputTokens": 29
     },
     {
       "fixture": "f4-map-partial",
       "condition": "summary",
       "pred": {
         "failedState": "MapItem",
-        "errorClass": "RuntimeError",
-        "rootCause": "map item failed: {\"id\":2,\"fail\":true,\"claimantEmail\":\"map-fail@example.com\"}"
+        "errorClass": "MapIterationFailed",
+        "rootCause": "map item failed: {\"id\": 2, \"fail\": true}"
       },
       "gold": {
         "failedState": "MapItem",
-        "errorClass": "States.TaskFailed",
+        "errorClass": "RuntimeError",
         "rootCause": "map item failed"
       },
       "score": {
@@ -145,20 +145,20 @@
         "error_class_ok": false,
         "root_cause_ok": true
       },
-      "inputTokens": 471,
-      "outputTokens": 54
+      "inputTokens": 580,
+      "outputTokens": 44
     },
     {
       "fixture": "f4-map-partial",
       "condition": "raw",
       "pred": {
         "failedState": "MapState",
-        "errorClass": "States.TaskFailed",
-        "rootCause": "RuntimeError: map item failed: {\\\"id\\\":2,\\\"fail\\\":true,\\\"claimantEmail\\\":\\\"map-fail@example.com\\\"}"
+        "errorClass": "RuntimeError",
+        "rootCause": "map item failed: {\"id\": 2, \"fail\": true}"
       },
       "gold": {
         "failedState": "MapItem",
-        "errorClass": "States.TaskFailed",
+        "errorClass": "RuntimeError",
         "rootCause": "map item failed"
       },
       "score": {
@@ -166,8 +166,8 @@
         "error_class_ok": true,
         "root_cause_ok": true
       },
-      "inputTokens": 1699,
-      "outputTokens": 65
+      "inputTokens": 2953,
+      "outputTokens": 43
     },
     {
       "fixture": "f4-map-large",
@@ -175,7 +175,7 @@
       "pred": {
         "failedState": "MapItem",
         "errorClass": "States.TaskFailed",
-        "rootCause": "map item failed: {\"id\":79,\"fail\":true,\"email\":\"item79@example.com\"}"
+        "rootCause": "RuntimeError: map item failed: {\"id\":79,\"fail\":true,\"email\":\"[REDACTED]\"}"
       },
       "gold": {
         "failedState": "MapItem",
@@ -187,8 +187,8 @@
         "error_class_ok": true,
         "root_cause_ok": true
       },
-      "inputTokens": 482,
-      "outputTokens": 55
+      "inputTokens": 480,
+      "outputTokens": 56
     },
     {
       "fixture": "f4-map-large",
@@ -229,7 +229,7 @@
         "error_class_ok": true,
         "root_cause_ok": true
       },
-      "inputTokens": 458,
+      "inputTokens": 488,
       "outputTokens": 39
     },
     {
@@ -250,7 +250,7 @@
         "error_class_ok": true,
         "root_cause_ok": true
       },
-      "inputTokens": 1097,
+      "inputTokens": 2264,
       "outputTokens": 39
     },
     {
@@ -258,7 +258,7 @@
       "condition": "summary",
       "pred": {
         "failedState": "Reject",
-        "errorClass": "Validation",
+        "errorClass": "UserError",
         "rootCause": "validation rejected"
       },
       "gold": {
@@ -271,15 +271,15 @@
         "error_class_ok": false,
         "root_cause_ok": true
       },
-      "inputTokens": 355,
-      "outputTokens": 28
+      "inputTokens": 388,
+      "outputTokens": 29
     },
     {
       "fixture": "f6-reject",
       "condition": "raw",
       "pred": {
         "failedState": "Reject",
-        "errorClass": "Task",
+        "errorClass": "UserError",
         "rootCause": "validation rejected"
       },
       "gold": {
@@ -292,13 +292,13 @@
         "error_class_ok": false,
         "root_cause_ok": true
       },
-      "inputTokens": 570,
-      "outputTokens": 28
+      "inputTokens": 948,
+      "outputTokens": 29
     }
   ],
   "totals": {
-    "inputTokens": 15002,
-    "outputTokens": 549,
-    "costUsd": 0.000602
+    "inputTokens": 21066,
+    "outputTokens": 509,
+    "costUsd": 0.000809
   }
 }

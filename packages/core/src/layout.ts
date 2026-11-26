@@ -52,15 +52,17 @@ export function layoutGraph(graph: WorkflowGraph): LaidOutGraph {
     });
   });
 
+  // Place Map/Parallel children to the RIGHT of the parent so they do not
+  // collide with the parent's Next sibling (e.g. MapItem overlapping Done).
   for (const [parentId, kids] of childrenOf) {
     const parentPos = positions.get(parentId) ?? { x: 0, y: 0 };
-    const kidWidth = kids.length * (NODE_W * 0.85) + Math.max(0, kids.length - 1) * 36;
-    const originX = parentPos.x + NODE_W / 2 - kidWidth / 2;
+    const kidW = NODE_W * 0.9;
+    const kidGap = 28;
     kids.forEach((kid, i) => {
       if (positions.has(kid.id)) return;
       positions.set(kid.id, {
-        x: originX + i * (NODE_W * 0.85 + 36),
-        y: parentPos.y + NODE_H + 40,
+        x: parentPos.x + NODE_W + GAP_X + i * (kidW + kidGap),
+        y: parentPos.y + i * (NODE_H * 0.35),
       });
     });
   }
