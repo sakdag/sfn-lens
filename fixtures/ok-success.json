@@ -1,0 +1,125 @@
+{
+  "id": "ok-success",
+  "description": "Happy-path execution that reaches Done",
+  "faultId": "OK",
+  "execution": {
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:ok-success",
+    "name": "ok-success",
+    "status": "SUCCEEDED",
+    "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
+    "startDate": "2026-11-26T09:00:00.000Z",
+    "stopDate": "2026-11-26T09:00:01.500Z"
+  },
+  "definition": {
+    "Comment": "sfn-lens demo workflow",
+    "StartAt": "Validate",
+    "States": {
+      "Validate": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Next": "Route"
+      },
+      "Route": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "reject",
+            "Next": "Reject"
+          }
+        ],
+        "Default": "Process"
+      },
+      "Process": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Next": "Done"
+      },
+      "Reject": {
+        "Type": "Fail",
+        "Error": "Rejected",
+        "Cause": "validation rejected"
+      },
+      "Done": {
+        "Type": "Succeed"
+      }
+    }
+  },
+  "history": [
+    {
+      "id": 1,
+      "type": "ExecutionStarted",
+      "timestamp": "2026-11-26T09:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T09:00:00.100Z",
+      "stateEnteredEventDetails": {
+        "name": "Validate",
+        "input": "{\"fault\":\"none\"}"
+      }
+    },
+    {
+      "id": 3,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T09:00:00.400Z",
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"none\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T09:00:00.450Z",
+      "stateEnteredEventDetails": { "name": "Route" }
+    },
+    {
+      "id": 5,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T09:00:00.500Z",
+      "stateExitedEventDetails": { "name": "Route" }
+    },
+    {
+      "id": 6,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T09:00:00.550Z",
+      "stateEnteredEventDetails": {
+        "name": "Process",
+        "input": "{\"fault\":\"none\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 7,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T09:00:01.200Z",
+      "stateExitedEventDetails": {
+        "name": "Process",
+        "output": "{\"ok\":true,\"processed\":true}"
+      }
+    },
+    {
+      "id": 8,
+      "type": "SucceedStateEntered",
+      "timestamp": "2026-11-26T09:00:01.300Z",
+      "stateEnteredEventDetails": { "name": "Done" }
+    },
+    {
+      "id": 9,
+      "type": "SucceedStateExited",
+      "timestamp": "2026-11-26T09:00:01.400Z",
+      "stateExitedEventDetails": { "name": "Done" }
+    },
+    {
+      "id": 10,
+      "type": "ExecutionSucceeded",
+      "timestamp": "2026-11-26T09:00:01.500Z"
+    }
+  ],
+  "gold": {
+    "failedState": null,
+    "errorClass": null,
+    "rootCause": null
+  }
+}

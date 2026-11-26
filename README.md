@@ -70,7 +70,8 @@ Ask the assistant to `show_execution` with `fixtureId: "f1-lambda-error"`.
 | --- | --- | --- |
 | `show_execution` | model + app | Graph + compact summary |
 | `compare_executions` | model + app | Diff two runs |
-| `list_executions` | model | Discover recent runs / fixtures |
+| `list_state_machines` | model | Discover state machine ARNs |
+| `list_executions` | model | Recent runs / fixtures for a machine |
 | `get_state_detail` | app only | Input/output/retries for one state |
 | `get_history_page` | app only | Paginated events for the UI |
 

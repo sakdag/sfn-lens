@@ -213,16 +213,68 @@ export function createServer(): McpServer {
 
   registerAppTool(
     server,
+    "list_state_machines",
+    {
+      title: "List Step Functions state machines",
+      description:
+        "List state machines in the configured AWS account/region (or fixture catalog). Use before list_executions when the ARN is unknown.",
+      inputSchema: z.object({
+        maxResults: z.number().int().min(1).max(100).optional(),
+      }),
+      _meta: {
+        ui: { visibility: ["model"] },
+      },
+    },
+    async (args) => {
+      if (fixtureModeEnabled()) {
+        const fixtures = await listFixtures();
+        const machines = [
+          ...new Map(
+            fixtures.map((f) => [
+              "fixture",
+              {
+                name: "fixtures",
+                stateMachineArn: "fixture",
+                status: "ACTIVE",
+              },
+            ]),
+          ).values(),
+        ];
+        return {
+          content: [{ type: "text", text: JSON.stringify({ machines, fixtures }, null, 2) }],
+          structuredContent: { mode: "fixture", machines, fixtures },
+        };
+      }
+      const { ListStateMachinesCommand } = await import("@aws-sdk/client-sfn");
+      const client = createSfnClient();
+      const out = await client.send(
+        new ListStateMachinesCommand({ maxResults: args.maxResults ?? 50 }),
+      );
+      const machines = (out.stateMachines ?? []).map((m) => ({
+        name: m.name,
+        stateMachineArn: m.stateMachineArn,
+        type: m.type,
+        creationDate: m.creationDate?.toISOString(),
+      }));
+      return {
+        content: [{ type: "text", text: JSON.stringify(machines, null, 2) }],
+        structuredContent: { mode: "live", machines },
+      };
+    },
+  );
+
+  registerAppTool(
+    server,
     "list_executions",
     {
       title: "List Step Functions executions",
       description:
-        "List recent executions for a state machine (or fixtures in fixture mode). Use this to discover execution ARNs before show_execution.",
+        "List recent executions for a state machine (or fixtures in fixture mode). Prefer list_state_machines first if the ARN is unknown. Pass stateMachineArn in live mode.",
       inputSchema: z.object({
         stateMachineArn: z
           .string()
           .optional()
-          .describe("State machine ARN; if omitted in live mode, uses the first machine found"),
+          .describe("State machine ARN (required in live mode)"),
         statusFilter: z
           .enum(["RUNNING", "SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED"])
           .optional(),
@@ -239,6 +291,9 @@ export function createServer(): McpServer {
           content: [{ type: "text", text: JSON.stringify(fixtures, null, 2) }],
           structuredContent: { mode: "fixture", executions: fixtures },
         };
+      }
+      if (!args.stateMachineArn) {
+        throw new Error("stateMachineArn is required in live mode; call list_state_machines first");
       }
       const client = createSfnClient();
       const executions = await listRecentExecutions(client, args);
