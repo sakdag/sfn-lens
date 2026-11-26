@@ -1,0 +1,27 @@
+{
+  "name": "@sfn-lens/server",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "sfn-lens": "./dist/index.js"
+  },
+  "main": "./dist/server.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node ./scripts/copy-ui.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start:stdio": "node dist/index.js --stdio",
+    "dev:stdio": "npm run build && node dist/index.js --stdio"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sfn": "^3.758.0",
+    "@modelcontextprotocol/ext-apps": "^2.1.0",
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@sfn-lens/core": "0.1.0",
+    "zod": "^4.2.0"
+  }
+}

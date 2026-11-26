@@ -1,0 +1,141 @@
+{
+  "id": "f1-lambda-error",
+  "description": "Task state Process fails with an uncaught Lambda error",
+  "faultId": "F1",
+  "execution": {
+    "executionArn": "arn:aws:states:eu-north-1:000000000000:execution:sfn-lens-demo:f1-lambda-error",
+    "name": "f1-lambda-error",
+    "status": "FAILED",
+    "stateMachineArn": "arn:aws:states:eu-north-1:000000000000:stateMachine:sfn-lens-demo",
+    "startDate": "2026-11-26T10:00:00.000Z",
+    "stopDate": "2026-11-26T10:00:04.200Z",
+    "error": "States.TaskFailed",
+    "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"injected lambda failure\"}"
+  },
+  "definition": {
+    "Comment": "sfn-lens demo workflow",
+    "StartAt": "Validate",
+    "States": {
+      "Validate": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": { "step": "validate", "fault.$": "$.fault" },
+        "Next": "Route"
+      },
+      "Route": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.fault",
+            "StringEquals": "reject",
+            "Next": "Reject"
+          }
+        ],
+        "Default": "Process"
+      },
+      "Process": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:eu-north-1:000000000000:function:sfn-lens-demo",
+        "Parameters": { "step": "process", "fault.$": "$.fault" },
+        "Retry": [
+          {
+            "ErrorEquals": ["States.ALL"],
+            "MaxAttempts": 0
+          }
+        ],
+        "Next": "Done"
+      },
+      "Reject": {
+        "Type": "Fail",
+        "Error": "Rejected",
+        "Cause": "validation rejected"
+      },
+      "Done": {
+        "Type": "Succeed"
+      }
+    }
+  },
+  "history": [
+    {
+      "id": 1,
+      "type": "ExecutionStarted",
+      "timestamp": "2026-11-26T10:00:00.000Z",
+      "executionStartedEventDetails": {
+        "input": "{\"fault\":\"lambda_error\",\"customer\":{\"email\":\"ada@example.com\"}}"
+      }
+    },
+    {
+      "id": 2,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T10:00:00.100Z",
+      "stateEnteredEventDetails": {
+        "name": "Validate",
+        "input": "{\"fault\":\"lambda_error\",\"customer\":{\"email\":\"ada@example.com\"}}"
+      }
+    },
+    {
+      "id": 3,
+      "type": "TaskStateExited",
+      "timestamp": "2026-11-26T10:00:00.400Z",
+      "stateExitedEventDetails": {
+        "name": "Validate",
+        "output": "{\"fault\":\"lambda_error\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 4,
+      "type": "ChoiceStateEntered",
+      "timestamp": "2026-11-26T10:00:00.450Z",
+      "stateEnteredEventDetails": { "name": "Route" }
+    },
+    {
+      "id": 5,
+      "type": "ChoiceStateExited",
+      "timestamp": "2026-11-26T10:00:00.500Z",
+      "stateExitedEventDetails": { "name": "Route" }
+    },
+    {
+      "id": 6,
+      "type": "TaskStateEntered",
+      "timestamp": "2026-11-26T10:00:00.550Z",
+      "stateEnteredEventDetails": {
+        "name": "Process",
+        "input": "{\"fault\":\"lambda_error\",\"ok\":true}"
+      }
+    },
+    {
+      "id": 7,
+      "type": "TaskFailed",
+      "timestamp": "2026-11-26T10:00:03.800Z",
+      "taskFailedEventDetails": {
+        "error": "States.TaskFailed",
+        "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"injected lambda failure\"}"
+      }
+    },
+    {
+      "id": 8,
+      "type": "ExecutionFailed",
+      "timestamp": "2026-11-26T10:00:04.200Z",
+      "executionFailedEventDetails": {
+        "error": "States.TaskFailed",
+        "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"injected lambda failure\"}"
+      }
+    }
+  ],
+  "stateDetails": {
+    "Validate": {
+      "input": { "fault": "lambda_error", "customer": { "email": "ada@example.com" } },
+      "output": { "fault": "lambda_error", "ok": true }
+    },
+    "Process": {
+      "input": { "fault": "lambda_error", "ok": true },
+      "error": "States.TaskFailed",
+      "cause": "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"injected lambda failure\"}"
+    }
+  },
+  "gold": {
+    "failedState": "Process",
+    "errorClass": "States.TaskFailed",
+    "rootCause": "injected lambda failure"
+  }
+}

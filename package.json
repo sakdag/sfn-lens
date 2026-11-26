@@ -1,0 +1,27 @@
+{
+  "name": "sfn-lens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP App for inspecting AWS Step Functions executions inside the chat",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @sfn-lens/core && npm run build -w @sfn-lens/view && npm run build -w @sfn-lens/server",
+    "build:core": "npm run build -w @sfn-lens/core",
+    "build:view": "npm run build -w @sfn-lens/view",
+    "build:server": "npm run build -w @sfn-lens/server",
+    "test": "npm run test -w @sfn-lens/core",
+    "start:stdio": "npm run start:stdio -w @sfn-lens/server",
+    "typecheck": "npm run typecheck -w @sfn-lens/core && npm run typecheck -w @sfn-lens/server && npm run typecheck -w @sfn-lens/view"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  }
+}
