@@ -14,17 +14,16 @@ export interface LaidOutGraph {
   height: number;
 }
 
-const NODE_W = 180;
-const NODE_H = 56;
-const GAP_X = 48;
-const GAP_Y = 72;
+const NODE_W = 200;
+const NODE_H = 64;
+const GAP_X = 72;
+const GAP_Y = 96;
 
 /**
- * Deterministic layered layout (no native deps). Top-level states in BFS layers;
- * nested Parallel/Map children offset under their parent.
+ * Deterministic layered layout (console-like top→bottom flow).
+ * Each layer is centered horizontally so Choice branches fan out symmetrically.
  */
 export function layoutGraph(graph: WorkflowGraph): LaidOutGraph {
-  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const topLevel = graph.nodes.filter((n) => !n.parentId);
   const childrenOf = new Map<string, GraphNode[]>();
   for (const n of graph.nodes) {
@@ -34,36 +33,42 @@ export function layoutGraph(graph: WorkflowGraph): LaidOutGraph {
     childrenOf.set(n.parentId, list);
   }
 
-  const startId = graph.startAt;
-  const layers = buildLayers(startId, topLevel, graph.edges);
+  const layers = buildLayers(graph.startAt, topLevel, graph.edges);
   const positions = new Map<string, { x: number; y: number }>();
 
-  let maxX = 0;
+  const maxLayerWidth = Math.max(
+    ...layers.map((layer) => layer.length * NODE_W + Math.max(0, layer.length - 1) * GAP_X),
+    NODE_W,
+  );
+
   layers.forEach((layer, depth) => {
+    const layerWidth = layer.length * NODE_W + Math.max(0, layer.length - 1) * GAP_X;
+    const originX = (maxLayerWidth - layerWidth) / 2;
     layer.forEach((id, i) => {
-      const x = i * (NODE_W + GAP_X);
-      const y = depth * (NODE_H + GAP_Y);
-      positions.set(id, { x, y });
-      maxX = Math.max(maxX, x + NODE_W);
+      positions.set(id, {
+        x: originX + i * (NODE_W + GAP_X),
+        y: 24 + depth * (NODE_H + GAP_Y),
+      });
     });
   });
 
-  // Place nested nodes under parents
   for (const [parentId, kids] of childrenOf) {
     const parentPos = positions.get(parentId) ?? { x: 0, y: 0 };
+    const kidWidth = kids.length * (NODE_W * 0.85) + Math.max(0, kids.length - 1) * 36;
+    const originX = parentPos.x + NODE_W / 2 - kidWidth / 2;
     kids.forEach((kid, i) => {
       if (positions.has(kid.id)) return;
       positions.set(kid.id, {
-        x: parentPos.x + (i % 3) * (NODE_W + 24),
-        y: parentPos.y + NODE_H + 28 + Math.floor(i / 3) * (NODE_H + 24),
+        x: originX + i * (NODE_W * 0.85 + 36),
+        y: parentPos.y + NODE_H + 40,
       });
     });
   }
 
-  // Orphans
+  let maxX = maxLayerWidth;
   for (const n of graph.nodes) {
     if (!positions.has(n.id)) {
-      positions.set(n.id, { x: maxX + GAP_X, y: 0 });
+      positions.set(n.id, { x: maxX + GAP_X, y: 24 });
       maxX += NODE_W + GAP_X;
     }
   }
@@ -73,10 +78,9 @@ export function layoutGraph(graph: WorkflowGraph): LaidOutGraph {
     return { ...n, x: p.x, y: p.y, width: NODE_W, height: NODE_H };
   });
 
-  const height = Math.max(...laid.map((n) => n.y + n.height), NODE_H) + 40;
-  const width = Math.max(...laid.map((n) => n.x + n.width), NODE_W) + 40;
+  const height = Math.max(...laid.map((n) => n.y + n.height), NODE_H) + 48;
+  const width = Math.max(...laid.map((n) => n.x + n.width), NODE_W) + 48;
 
-  void byId;
   return { nodes: laid, edges: graph.edges, width, height };
 }
 
@@ -90,32 +94,45 @@ function buildLayers(
   const adj = new Map<string, string[]>();
   for (const e of edges) {
     if (!topIds.has(e.source) || !topIds.has(e.target)) continue;
+    // Prefer next/choice/default order: next first, then choice, default, catch last
     const list = adj.get(e.source) ?? [];
     list.push(e.target);
     adj.set(e.source, list);
   }
 
+  // Stable unique adjacency preserving edge order from ASL walk
+  for (const [k, list] of adj) {
+    adj.set(k, [...new Set(list)]);
+  }
+
   const layers: string[][] = [];
-  const seen = new Set<string>();
-  let current = [start];
-  while (current.length) {
-    const layer = current.filter((id) => !seen.has(id));
-    for (const id of layer) seen.add(id);
-    if (layer.length) layers.push(layer);
-    const next: string[] = [];
-    for (const id of layer) {
-      for (const t of adj.get(id) ?? []) {
-        if (!seen.has(t)) next.push(t);
+  const depthOf = new Map<string, number>();
+  const queue = [start];
+  depthOf.set(start, 0);
+
+  while (queue.length) {
+    const id = queue.shift()!;
+    const depth = depthOf.get(id) ?? 0;
+    if (!layers[depth]) layers[depth] = [];
+    if (!layers[depth]!.includes(id)) layers[depth]!.push(id);
+
+    for (const t of adj.get(id) ?? []) {
+      const nextDepth = depth + 1;
+      const prev = depthOf.get(t);
+      if (prev == null || nextDepth < prev) {
+        depthOf.set(t, nextDepth);
+        queue.push(t);
       }
     }
-    current = [...new Set(next)];
   }
 
   for (const n of topLevel) {
-    if (!seen.has(n.id)) {
+    if (!depthOf.has(n.id)) {
+      const d = layers.length;
+      depthOf.set(n.id, d);
       layers.push([n.id]);
-      seen.add(n.id);
     }
   }
-  return layers;
+
+  return layers.filter((l) => l.length > 0);
 }

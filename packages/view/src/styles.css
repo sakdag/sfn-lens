@@ -1,17 +1,126 @@
-:root {
-  color-scheme: light dark;
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --canvas: #f0f2f5;
+  --panel: #ffffff;
+  --border: #d1d5db;
+  --border-strong: #9ca3af;
+  --text: #16191f;
+  --muted: #545b64;
+  --accent: #0972d3;
+  --ok: #037f0c;
+  --ok-bg: #f2f8f0;
+  --ok-border: #37a864;
+  --ok-icon-bg: #ddf4e4;
+  --fail: #d91515;
+  --fail-bg: #fdf2f2;
+  --fail-border: #e02c2c;
+  --fail-icon-bg: #fde8e8;
+  --caught: #b76e00;
+  --caught-bg: #fff8e6;
+  --caught-icon-bg: #fff1cc;
+  --running: #0972d3;
+  --running-bg: #f1f8fd;
+  --running-icon-bg: #d5e8f8;
+  --skip: #687078;
+  --skip-bg: #f2f3f3;
+  --node-bg: #ffffff;
+  --node-icon-bg: #eef2f6;
+  --node-icon-fg: #414d5c;
+  --code-bg: #f8f9fa;
+  --code-fg: #232f3e;
+  --edge-idle: #687078;
+  --edge-ok: #037f0c;
+  --edge-fail: #d91515;
+  --dot-grid: #c5cbd3;
+  --control-bg: #ffffff;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --shadow-hover: 0 2px 8px rgba(15, 23, 42, 0.1);
+  font-family: "Amazon Ember", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0f1419;
+  --canvas: #0b1015;
   --panel: #1a222c;
   --border: #2c3a48;
+  --border-strong: #4a5562;
   --text: #e7eef6;
-  --muted: #8b9bab;
-  --accent: #3d8bfd;
+  --muted: #9aa7b5;
+  --accent: #4da3ff;
   --ok: #3dd68c;
+  --ok-bg: #123024;
+  --ok-border: #2f9e68;
+  --ok-icon-bg: #1a3d2e;
   --fail: #f07178;
+  --fail-bg: #3a1a1d;
+  --fail-border: #c94c52;
+  --fail-icon-bg: #4a2226;
   --caught: #e6b450;
-  --retry: #c4a1ff;
-  --skip: #4a5562;
-  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --caught-bg: #3a2e14;
+  --caught-icon-bg: #4a3a18;
+  --running: #4da3ff;
+  --running-bg: #132536;
+  --running-icon-bg: #1a3348;
+  --skip: #7a8794;
+  --skip-bg: #151c24;
+  --node-bg: #1a222c;
+  --node-icon-bg: #243040;
+  --node-icon-fg: #c5d0dc;
+  --code-bg: #0b1015;
+  --code-fg: #d7e0ea;
+  --edge-idle: #6b7a88;
+  --edge-ok: #3dd68c;
+  --edge-fail: #f07178;
+  --dot-grid: #2a3542;
+  --control-bg: #1a222c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.28);
+  --shadow-hover: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* Fallback when host has not set data-theme yet */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1419;
+    --canvas: #0b1015;
+    --panel: #1a222c;
+    --border: #2c3a48;
+    --border-strong: #4a5562;
+    --text: #e7eef6;
+    --muted: #9aa7b5;
+    --accent: #4da3ff;
+    --ok: #3dd68c;
+    --ok-bg: #123024;
+    --ok-border: #2f9e68;
+    --ok-icon-bg: #1a3d2e;
+    --fail: #f07178;
+    --fail-bg: #3a1a1d;
+    --fail-border: #c94c52;
+    --fail-icon-bg: #4a2226;
+    --caught: #e6b450;
+    --caught-bg: #3a2e14;
+    --caught-icon-bg: #4a3a18;
+    --running: #4da3ff;
+    --running-bg: #132536;
+    --running-icon-bg: #1a3348;
+    --skip: #7a8794;
+    --skip-bg: #151c24;
+    --node-bg: #1a222c;
+    --node-icon-bg: #243040;
+    --node-icon-fg: #c5d0dc;
+    --code-bg: #0b1015;
+    --code-fg: #d7e0ea;
+    --edge-idle: #6b7a88;
+    --edge-ok: #3dd68c;
+    --edge-fail: #f07178;
+    --dot-grid: #2a3542;
+    --control-bg: #1a222c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.28);
+    --shadow-hover: 0 2px 10px rgba(0, 0, 0, 0.45);
+  }
 }
 
 * {
@@ -37,18 +146,18 @@ body,
 .header {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 20px;
-  align-items: baseline;
-  padding: 12px 16px;
+  gap: 10px 16px;
+  align-items: center;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
 }
 
 .header h1 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .meta {
@@ -56,65 +165,148 @@ body,
   font-size: 12px;
 }
 
+.fixture-tag {
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--skip-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
+  border: 1px solid transparent;
 }
 
-.badge.SUCCEEDED { background: color-mix(in oklab, var(--ok) 25%, transparent); color: var(--ok); }
-.badge.FAILED, .badge.TIMED_OUT { background: color-mix(in oklab, var(--fail) 25%, transparent); color: var(--fail); }
-.badge.CAUGHT { background: color-mix(in oklab, var(--caught) 25%, transparent); color: var(--caught); }
-.badge.RUNNING { background: color-mix(in oklab, var(--accent) 25%, transparent); color: var(--accent); }
-.badge.NOT_RUN { background: color-mix(in oklab, var(--skip) 40%, transparent); color: var(--muted); }
+.badge.SUCCEEDED {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.badge.FAILED,
+.badge.TIMED_OUT {
+  background: var(--fail-bg);
+  color: var(--fail);
+  border-color: color-mix(in srgb, var(--fail) 35%, transparent);
+}
+.badge.CAUGHT {
+  background: var(--caught-bg);
+  color: var(--caught);
+  border-color: color-mix(in srgb, var(--caught) 35%, transparent);
+}
+.badge.RUNNING {
+  background: var(--running-bg);
+  color: var(--running);
+  border-color: color-mix(in srgb, var(--running) 35%, transparent);
+}
+.badge.NOT_RUN,
+.badge.ABORTED {
+  background: var(--skip-bg);
+  color: var(--skip);
+  border-color: var(--border);
+}
 
 .body {
   display: grid;
-  grid-template-columns: 1fr minmax(240px, 320px);
+  grid-template-columns: 1fr minmax(260px, 340px);
   min-height: 0;
 }
 
 .graph-pane {
+  position: relative;
   min-height: 0;
+  height: 100%;
+  background: var(--canvas);
   border-right: 1px solid var(--border);
 }
 
+.graph-pane .react-flow {
+  width: 100%;
+  height: 100%;
+  background: var(--canvas);
+}
+
+.graph-pane .react-flow__node {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+.graph-pane .react-flow__controls {
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.graph-pane .react-flow__controls-button {
+  background: var(--control-bg);
+  border-bottom-color: var(--border);
+  fill: var(--muted);
+}
+
+.graph-pane .react-flow__edge-textbg {
+  fill: var(--canvas);
+}
+
+.graph-pane .react-flow__edge-text {
+  fill: var(--muted);
+  font-size: 10px;
+}
+
 .detail-pane {
-  padding: 12px 14px;
+  padding: 14px 16px;
   overflow: auto;
   background: var(--panel);
   font-size: 12px;
 }
 
 .detail-pane h2 {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .detail-pane pre {
   margin: 0;
-  padding: 8px;
-  border-radius: 6px;
-  background: #0b1015;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--code-bg);
   border: 1px solid var(--border);
   overflow: auto;
-  max-height: 180px;
+  max-height: 200px;
   white-space: pre-wrap;
   word-break: break-word;
+  font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--code-fg);
 }
 
 .detail-section {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .detail-section .label {
   color: var(--muted);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .empty {
@@ -123,37 +315,151 @@ body,
 }
 
 .state-node {
-  min-width: 160px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #121820;
-  font-size: 12px;
-  box-shadow: 0 0 0 1px transparent;
+  position: relative;
+  width: 200px;
+  padding: 10px 12px 10px 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--node-bg);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.state-node-inner {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 0 10px;
+  align-items: center;
+}
+
+.state-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: var(--node-bg) !important;
+  border: 1.5px solid var(--border-strong) !important;
+}
+
+.state-node:hover {
+  box-shadow: var(--shadow-hover);
 }
 
 .state-node.selected {
-  box-shadow: 0 0 0 2px var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.state-node.status-SUCCEEDED { border-color: color-mix(in oklab, var(--ok) 60%, var(--border)); }
-.state-node.status-FAILED { border-color: var(--fail); background: color-mix(in oklab, var(--fail) 12%, #121820); }
-.state-node.status-CAUGHT { border-color: var(--caught); }
-.state-node.status-RUNNING { border-color: var(--accent); }
-.state-node.status-NOT_RUN { opacity: 0.55; }
+.state-node .icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--node-icon-bg);
+  color: var(--node-icon-fg);
+  flex-shrink: 0;
+}
+
+.state-node .icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.state-node .body-text {
+  min-width: 0;
+}
 
 .state-node .name {
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .state-node .sub {
+  margin-top: 3px;
   color: var(--muted);
-  margin-top: 2px;
+  font-size: 11px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.react-flow__edge-path.edge-fail {
-  stroke: var(--fail) !important;
-  stroke-width: 2.5;
+.state-node .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--skip);
+  flex-shrink: 0;
+}
+
+.state-node .error-line {
+  margin-top: 4px;
+  color: var(--fail);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.state-node.status-SUCCEEDED {
+  border-color: var(--ok-border);
+  background: linear-gradient(180deg, var(--node-bg) 0%, var(--ok-bg) 160%);
+}
+.state-node.status-SUCCEEDED .icon {
+  background: var(--ok-icon-bg);
+  color: var(--ok);
+}
+.state-node.status-SUCCEEDED .status-dot {
+  background: var(--ok);
+}
+
+.state-node.status-FAILED {
+  border-color: var(--fail-border);
+  background: linear-gradient(180deg, var(--node-bg) 0%, var(--fail-bg) 160%);
+}
+.state-node.status-FAILED .icon {
+  background: var(--fail-icon-bg);
+  color: var(--fail);
+}
+.state-node.status-FAILED .status-dot {
+  background: var(--fail);
+}
+
+.state-node.status-CAUGHT {
+  border-color: color-mix(in srgb, var(--caught) 55%, transparent);
+  background: linear-gradient(180deg, var(--node-bg) 0%, var(--caught-bg) 160%);
+}
+.state-node.status-CAUGHT .icon {
+  background: var(--caught-icon-bg);
+  color: var(--caught);
+}
+.state-node.status-CAUGHT .status-dot {
+  background: var(--caught);
+}
+
+.state-node.status-RUNNING {
+  border-color: color-mix(in srgb, var(--running) 55%, transparent);
+  background: linear-gradient(180deg, var(--node-bg) 0%, var(--running-bg) 160%);
+}
+.state-node.status-RUNNING .icon {
+  background: var(--running-icon-bg);
+  color: var(--running);
+}
+.state-node.status-RUNNING .status-dot {
+  background: var(--running);
+}
+
+.state-node.status-NOT_RUN,
+.state-node.status-ABORTED {
+  opacity: 0.72;
+  background: var(--skip-bg);
+  border-style: dashed;
 }
 
 .connecting {
@@ -161,12 +467,13 @@ body,
   place-items: center;
   height: 100%;
   color: var(--muted);
+  background: var(--canvas);
 }
 
 @media (max-width: 640px) {
   .body {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 40%;
+    grid-template-rows: 1fr 42%;
   }
   .graph-pane {
     border-right: none;

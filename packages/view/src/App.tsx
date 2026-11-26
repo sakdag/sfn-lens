@@ -1,16 +1,20 @@
-import type { App as McpApp } from "@modelcontextprotocol/ext-apps";
-import { useApp } from "@modelcontextprotocol/ext-apps/react";
+import type { App as McpApp, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import {
+  useApp,
+  useDocumentTheme,
+  useHostStyles,
+} from "@modelcontextprotocol/ext-apps/react";
 import {
   Background,
+  BackgroundVariant,
   Controls,
   MarkerType,
-  MiniMap,
   ReactFlow,
   type Edge,
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailPanel } from "./DetailPanel";
 import { StateNode, type StateNodeData } from "./StateNode";
 import type { ShowExecutionPayload, StateDetail } from "./types";
@@ -21,11 +25,20 @@ function asPayload(data: unknown): ShowExecutionPayload | null {
   if (!data || typeof data !== "object") return null;
   const obj = data as Record<string, unknown>;
   if (obj.comparison && obj.right) {
-    // compare_executions — show the right (usually failed) run
     return obj.right as ShowExecutionPayload;
   }
   if (obj.graph && obj.overlay) return obj as unknown as ShowExecutionPayload;
   return null;
+}
+
+function isFixtureArn(arn: string | undefined): boolean {
+  return Boolean(arn?.includes(":000000000000:") || arn?.startsWith("fixture"));
+}
+
+function cssVar(name: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || fallback;
 }
 
 export function App() {
@@ -33,6 +46,7 @@ export function App() {
   const [selected, setSelected] = useState<string | undefined>();
   const [detail, setDetail] = useState<StateDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [hostContext, setHostContext] = useState<McpUiHostContext | undefined>();
 
   const { app, error } = useApp({
     appInfo: { name: "sfn-lens", version: "0.1.0" },
@@ -46,9 +60,19 @@ export function App() {
           setDetail(null);
         }
       };
+      created.onhostcontextchanged = (ctx) => {
+        setHostContext((prev) => ({ ...prev, ...ctx }));
+      };
       created.onerror = console.error;
     },
   });
+
+  useEffect(() => {
+    if (app) setHostContext(app.getHostContext());
+  }, [app]);
+
+  useHostStyles(app, hostContext);
+  const theme = useDocumentTheme();
 
   const onSelectState = useCallback(
     async (mcp: McpApp, stateName: string, current: ShowExecutionPayload) => {
@@ -102,9 +126,23 @@ export function App() {
     [],
   );
 
+  const palette = useMemo(() => {
+    // Re-read when theme flips so edges/background stay in sync.
+    void theme;
+    return {
+      idle: cssVar("--edge-idle", "#687078"),
+      ok: cssVar("--edge-ok", "#037f0c"),
+      fail: cssVar("--edge-fail", "#d91515"),
+      muted: cssVar("--muted", "#545b64"),
+      canvas: cssVar("--canvas", "#f0f2f5"),
+      dots: cssVar("--dot-grid", "#c5cbd3"),
+    };
+  }, [theme]);
+
   const { nodes, edges } = useMemo(() => {
     if (!payload) return { nodes: [] as Node[], edges: [] as Edge[] };
-    const failedPath = new Set(payload.path);
+    const pathSet = new Set(payload.path);
+
     const nodes: Node<StateNodeData>[] = payload.graph.nodes.map((n) => {
       const ov = payload.overlay.states[n.name];
       return {
@@ -117,31 +155,59 @@ export function App() {
           status: ov?.status ?? "NOT_RUN",
           durationMs: ov?.durationMs,
           error: ov?.error,
-          isFailedPath: failedPath.has(n.name) && payload.status === "FAILED",
+          isFailedPath: pathSet.has(n.name) && payload.status === "FAILED",
         },
         selected: selected === n.name,
       };
     });
 
     const edges: Edge[] = payload.graph.edges.map((e) => {
+      const sourceNode = payload.graph.nodes.find((n) => n.id === e.source);
       const targetNode = payload.graph.nodes.find((n) => n.id === e.target);
-      const onFailPath =
-        payload.status === "FAILED" &&
-        targetNode &&
-        failedPath.has(targetNode.name) &&
-        payload.graph.nodes.some((n) => n.id === e.source && failedPath.has(n.name));
+      const sourceRan = sourceNode ? pathSet.has(sourceNode.name) : false;
+      const targetRan = targetNode ? pathSet.has(targetNode.name) : false;
+      const onTakenPath = sourceRan && targetRan;
+      const onFailPath = onTakenPath && payload.status === "FAILED";
+      const notTaken = !onTakenPath;
+
+      let stroke = palette.idle;
+      let strokeWidth = 1.5;
+      if (onFailPath) {
+        stroke = palette.fail;
+        strokeWidth = 2.5;
+      } else if (onTakenPath) {
+        stroke = palette.ok;
+        strokeWidth = 2.25;
+      }
+
       return {
         id: e.id,
         source: e.source,
         target: e.target,
-        label: e.label,
-        style: onFailPath ? { stroke: "#f07178", strokeWidth: 2.5 } : undefined,
-        markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+        label: e.kind === "choice" || e.kind === "default" || e.kind === "catch" ? e.label : undefined,
+        type: "smoothstep",
+        animated: onFailPath,
+        style: {
+          stroke,
+          strokeWidth,
+          opacity: notTaken ? 0.35 : 1,
+          strokeDasharray: e.kind === "catch" ? "6 4" : undefined,
+        },
+        labelStyle: { fill: palette.muted, fontSize: 10, fontWeight: 600 },
+        labelBgStyle: { fill: palette.canvas, fillOpacity: 0.92 },
+        labelBgPadding: [3, 1] as [number, number],
+        labelBgBorderRadius: 3,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 14,
+          height: 14,
+          color: stroke,
+        },
       };
     });
 
     return { nodes, edges };
-  }, [payload, selected]);
+  }, [payload, selected, palette]);
 
   if (error) {
     return <div className="connecting">Error: {error.message}</div>;
@@ -149,6 +215,8 @@ export function App() {
   if (!app) {
     return <div className="connecting">Connecting to host…</div>;
   }
+
+  const fixture = payload ? isFixtureArn(payload.executionArn) : false;
 
   return (
     <div className="app">
@@ -158,6 +226,7 @@ export function App() {
           <>
             <span className={`badge ${payload.status}`}>{payload.status}</span>
             <span className="meta">{payload.name}</span>
+            {fixture ? <span className="fixture-tag">fixture (not in AWS)</span> : null}
             {payload.failedState ? (
               <span className="meta">failed @ {payload.failedState}</span>
             ) : null}
@@ -177,15 +246,27 @@ export function App() {
               edges={edges}
               nodeTypes={nodeTypes}
               fitView
+              fitViewOptions={{ padding: 0.18 }}
+              minZoom={0.35}
+              maxZoom={1.5}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              elementsSelectable
+              colorMode={theme === "dark" ? "dark" : "light"}
               onNodeClick={(_, node) => {
                 const name = (node.data as StateNodeData).name;
                 void onSelectState(app, name, payload);
               }}
               proOptions={{ hideAttribution: true }}
+              defaultEdgeOptions={{ type: "smoothstep" }}
             >
-              <Background gap={16} size={1} />
-              <Controls />
-              <MiniMap pannable zoomable />
+              <Background
+                variant={BackgroundVariant.Dots}
+                gap={18}
+                size={1.2}
+                color={palette.dots}
+              />
+              <Controls showInteractive={false} />
             </ReactFlow>
           ) : (
             <div className="empty">No execution loaded.</div>
