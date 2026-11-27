@@ -53,7 +53,7 @@ In `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 Quit Claude fully and reopen. Then try:
 
-> Show me the latest failed Step Functions run on my account — use sfn-lens so I can see the graph.
+> I have a Step Functions state machine called sfn-lens-demo — show me the latest failure in sfn-lens.
 
 ### Redrive (optional)
 
