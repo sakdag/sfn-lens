@@ -18,10 +18,13 @@ const NODE_W = 200;
 const NODE_H = 64;
 const GAP_X = 72;
 const GAP_Y = 96;
+const NEST_INDENT = 40;
+const NEST_GAP = 28;
 
 /**
  * Deterministic layered layout (console-like top→bottom flow).
- * Each layer is centered horizontally so Choice branches fan out symmetrically.
+ * Map/Parallel children sit under their parent; later top-level rows shift down
+ * so nested nodes never land on a sibling in the same layer (e.g. MapItem on PickProcess).
  */
 export function layoutGraph(graph: WorkflowGraph): LaidOutGraph {
   const topLevel = graph.nodes.filter((n) => !n.parentId);
@@ -52,20 +55,39 @@ export function layoutGraph(graph: WorkflowGraph): LaidOutGraph {
     });
   });
 
-  // Place Map/Parallel children to the RIGHT of the parent so they do not
-  // collide with the parent's Next sibling (e.g. MapItem overlapping Done).
-  for (const [parentId, kids] of childrenOf) {
-    const parentPos = positions.get(parentId) ?? { x: 0, y: 0 };
-    const kidW = NODE_W * 0.9;
-    const kidGap = 28;
+  // Nest children under parents (top → bottom), shifting everything below each nest.
+  const parents = [...childrenOf.keys()].sort((a, b) => {
+    const ya = positions.get(a)?.y ?? 0;
+    const yb = positions.get(b)?.y ?? 0;
+    return ya - yb;
+  });
+
+  for (const parentId of parents) {
+    const kids = childrenOf.get(parentId) ?? [];
+    const parentPos = positions.get(parentId);
+    if (!parentPos || kids.length === 0) continue;
+
+    const nestH = kids.length * (NODE_H + NEST_GAP) + 16;
+    const kidIds = new Set(kids.map((k) => k.id));
+
     kids.forEach((kid, i) => {
-      if (positions.has(kid.id)) return;
       positions.set(kid.id, {
-        x: parentPos.x + NODE_W + GAP_X + i * (kidW + kidGap),
-        y: parentPos.y + i * (NODE_H * 0.35),
+        x: parentPos.x + NEST_INDENT,
+        y: parentPos.y + NODE_H + NEST_GAP + i * (NODE_H + NEST_GAP),
       });
     });
+
+    // Push every other node that sits below the parent so nested rows have room.
+    for (const [id, pos] of positions) {
+      if (id === parentId || kidIds.has(id)) continue;
+      if (pos.y > parentPos.y) {
+        positions.set(id, { x: pos.x, y: pos.y + nestH });
+      }
+    }
   }
+
+  // Resolve any remaining AABB overlaps (defensive).
+  resolveOverlaps(positions, graph.nodes);
 
   let maxX = maxLayerWidth;
   for (const n of graph.nodes) {
@@ -86,6 +108,36 @@ export function layoutGraph(graph: WorkflowGraph): LaidOutGraph {
   return { nodes: laid, edges: graph.edges, width, height };
 }
 
+function resolveOverlaps(
+  positions: Map<string, { x: number; y: number }>,
+  nodes: GraphNode[],
+): void {
+  const ids = nodes.map((n) => n.id);
+  let moved = true;
+  let guard = 0;
+  while (moved && guard++ < 40) {
+    moved = false;
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i]!;
+        const b = ids[j]!;
+        const pa = positions.get(a)!;
+        const pb = positions.get(b)!;
+        const overlapX = pa.x < pb.x + NODE_W && pa.x + NODE_W > pb.x;
+        const overlapY = pa.y < pb.y + NODE_H && pa.y + NODE_H > pb.y;
+        if (!overlapX || !overlapY) continue;
+        // Push the lower (or rightmost if tied) node down.
+        if (pb.y >= pa.y) {
+          positions.set(b, { x: pb.x, y: pa.y + NODE_H + NEST_GAP });
+        } else {
+          positions.set(a, { x: pa.x, y: pb.y + NODE_H + NEST_GAP });
+        }
+        moved = true;
+      }
+    }
+  }
+}
+
 function buildLayers(
   startAt: string,
   topLevel: GraphNode[],
@@ -96,13 +148,11 @@ function buildLayers(
   const adj = new Map<string, string[]>();
   for (const e of edges) {
     if (!topIds.has(e.source) || !topIds.has(e.target)) continue;
-    // Prefer next/choice/default order: next first, then choice, default, catch last
     const list = adj.get(e.source) ?? [];
     list.push(e.target);
     adj.set(e.source, list);
   }
 
-  // Stable unique adjacency preserving edge order from ASL walk
   for (const [k, list] of adj) {
     adj.set(k, [...new Set(list)]);
   }

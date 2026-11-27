@@ -5,7 +5,7 @@ Offline execution JSON for fixture mode and the diagnosis eval.
 | Id | Fault | Expected status |
 | --- | --- | --- |
 | `f1-lambda-error` | Uncaught Lambda failure on `ProcessFail` | `FAILED` |
-| `f2-timeout` | Task timeout on `ProcessFail` | `TIMED_OUT` |
+| `f2-timeout` | Task timeout on `ProcessFail` | `FAILED` (error `States.Timeout`) |
 | `f3-throttle` | Retries exhausted on `ProcessThrottle` | `FAILED` |
 | `f4-map-partial` | Map item failure | `FAILED` |
 | `f4-map-large` | Large Map (synthetic); failure on last item | `FAILED` |

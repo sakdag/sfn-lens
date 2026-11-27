@@ -46,7 +46,7 @@ describe("aslToGraph", () => {
 });
 
 describe("layout", () => {
-  it("places Map iterator children beside the Map, not over Done", () => {
+  it("places Map iterator children under the Map, not over Done", () => {
     const def: AslDefinition = {
       StartAt: "ProcessMap",
       States: {
@@ -66,14 +66,52 @@ describe("layout", () => {
     const map = laid.nodes.find((n) => n.name === "ProcessMap")!;
     const item = laid.nodes.find((n) => n.name === "MapItem")!;
     const done = laid.nodes.find((n) => n.name === "Done")!;
-    assert.ok(item.x >= map.x + map.width, "MapItem should sit to the right of ProcessMap");
-    const overlapX =
-      item.x < done.x + done.width && item.x + item.width > done.x;
-    const overlapY =
-      item.y < done.y + done.height && item.y + item.height > done.y;
-    assert.equal(overlapX && overlapY, false, "MapItem must not overlap Done");
+    assert.ok(item.y >= map.y + map.height, "MapItem should sit below ProcessMap");
+    assert.equal(overlaps(item, done), false, "MapItem must not overlap Done");
+  });
+
+  it("does not place MapItem on top of a same-layer sibling like PickProcess", () => {
+    const def: AslDefinition = {
+      StartAt: "MaybeMap",
+      States: {
+        MaybeMap: {
+          Type: "Choice",
+          Choices: [{ Variable: "$.fault", StringEquals: "map_partial", Next: "ProcessMap" }],
+          Default: "PickProcess",
+        },
+        ProcessMap: {
+          Type: "Map",
+          ItemsPath: "$.items",
+          Iterator: {
+            StartAt: "MapItem",
+            States: { MapItem: { Type: "Task", Resource: "arn:aws:lambda:eu:1:fn", End: true } },
+          },
+          Next: "Done",
+        },
+        PickProcess: { Type: "Task", Resource: "arn:aws:lambda:eu:1:fn", Next: "Done" },
+        Done: { Type: "Succeed" },
+      },
+    };
+    const laid = layoutGraph(aslToGraph(def));
+    const item = laid.nodes.find((n) => n.name === "MapItem")!;
+    const pick = laid.nodes.find((n) => n.name === "PickProcess")!;
+    const map = laid.nodes.find((n) => n.name === "ProcessMap")!;
+    assert.ok(item.y > map.y, "MapItem below ProcessMap");
+    assert.equal(
+      item.x === pick.x && item.y === pick.y,
+      false,
+      "MapItem must not share PickProcess coordinates",
+    );
+    assert.equal(overlaps(item, pick), false, "MapItem must not overlap PickProcess");
   });
 });
+
+function overlaps(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
 
 describe("overlay + summary", () => {
   it("marks failed state from history", () => {
